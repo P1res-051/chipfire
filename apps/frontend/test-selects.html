@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Selects - ChipFire</title>
+    <style>
+        :root {
+            --background: 240 10% 4%;
+            --foreground: 210 40% 98%;
+            --card: 240 10% 7%;
+            --card-foreground: 210 40% 98%;
+            --input: 240 8% 18%;
+            --border: 240 8% 18%;
+            --muted-foreground: 215 20% 65%;
+            --radius: 14px;
+        }
+
+        * {
+            border-color: hsl(var(--border));
+        }
+
+        body {
+            background-color: hsl(var(--background));
+            color: hsl(var(--foreground));
+            color-scheme: dark;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            padding: 40px;
+            margin: 0;
+            font-feature-settings: "rlig" 1, "calt" 1;
+        }
+
+        h1, h2 {
+            color: hsl(var(--foreground));
+            margin-top: 30px;
+            border-bottom: 1px solid hsl(var(--border));
+            padding-bottom: 10px;
+        }
+
+        .section {
+            background-color: hsl(var(--card));
+            border: 1px solid hsl(var(--border));
+            border-radius: var(--radius);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: hsl(var(--foreground));
+            font-weight: 500;
+        }
+
+        select {
+            flex: 1;
+            height: 40px;
+            width: 100%;
+            border-radius: calc(var(--radius) - 8px);
+            border: 1px solid hsl(var(--input));
+            background-color: hsl(240, 10%, 9%);
+            color: hsl(210, 40%, 98%);
+            padding: 8px 12px;
+            font-size: 14px;
+            transition: all 200ms ease;
+            color-scheme: dark;
+        }
+
+        select:hover {
+            border-color: hsl(262, 83%, 58%);
+            box-shadow: 0 0 0 2px rgba(162, 155, 254, 0.15);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: hsl(262, 83%, 58%);
+            box-shadow: 0 0 0 3px rgba(162, 155, 254, 0.2);
+        }
+
+        select:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        select option {
+            background-color: hsl(240, 10%, 9%);
+            color: hsl(210, 40%, 98%);
+        }
+
+        select option:checked {
+            background: linear-gradient(#08a6f6, #08a6f6);
+            background-color: hsl(262, 83%, 58%);
+            color: hsl(210, 40%, 98%);
+        }
+
+        .status-ok {
+            color: hsl(142, 76%, 45%);
+            font-weight: bold;
+        }
+
+        .status-error {
+            color: hsl(0, 84%, 60%);
+            font-weight: bold;
+        }
+
+        .test-result {
+            background-color: hsl(240, 10%, 7%);
+            border-left: 4px solid hsl(262, 83%, 58%);
+            padding: 12px;
+            margin-top: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        button {
+            background-color: hsl(262, 83%, 58%);
+            color: hsl(210, 40%, 98%);
+            border: none;
+            padding: 10px 20px;
+            border-radius: calc(var(--radius) - 8px);
+            cursor: pointer;
+            font-weight: 500;
+            margin-top: 10px;
+            transition: all 200ms ease;
+        }
+
+        button:hover {
+            background-color: hsl(262, 83%, 65%);
+            box-shadow: 0 0 20px rgba(162, 155, 254, 0.3);
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste Visual de Selects/Dropdowns - ChipFire</h1>
+    <p>Teste: <strong>color-scheme: dark</strong> + <strong>HSL syntax corrigido</strong></p>
+
+    <h2>/admin/contacts — Status do Contato</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="status-contacts">Status:</label>
+            <select id="status-contacts" onchange="testSelect(this)">
+                <option value="">Todos</option>
+                <option value="ACTIVE">ACTIVE</option>
+                <option value="INACTIVE">INACTIVE</option>
+                <option value="OPTOUT">OPTOUT</option>
+            </select>
+            <div class="test-result">
+                ✅ Select renderizado com background escuro
+                <br/>→ Clique e verifique se a lista abre escura (não branca)
+                <br/>→ Verifique se o texto está legível
+                <br/>→ Passe o mouse (hover) deve dar borda neon
+                <br/>→ Selecione opção (selected) deve ser neon roxo
+            </div>
+        </div>
+    </div>
+
+    <h2>/admin/campaigns — Status da Campanha</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="status-campaign">Status:</label>
+            <select id="status-campaign" onchange="testSelect(this)">
+                <option value="">Todos</option>
+                <option value="DRAFT">DRAFT</option>
+                <option value="SCHEDULED">SCHEDULED</option>
+                <option value="SENDING">SENDING</option>
+                <option value="COMPLETED">COMPLETED</option>
+                <option value="PAUSED">PAUSED</option>
+            </select>
+            <div class="test-result">
+                ✅ Select com múltiplas opções
+            </div>
+        </div>
+    </div>
+
+    <h2>/admin/content-groups — Tipo de Grupo</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="group-type">Tipo de Grupo:</label>
+            <select id="group-type" onchange="testSelect(this)">
+                <option value="">Selecione</option>
+                <option value="SEQUENTIAL">Sequential</option>
+                <option value="RANDOM">Random</option>
+                <option value="WEIGHTED">Weighted</option>
+            </select>
+            <div class="test-result">
+                ✅ Select para escolher tipo de conteúdo dinâmico
+            </div>
+        </div>
+    </div>
+
+    <h2>/admin/media — Tipo de Mídia</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="media-type">Tipo:</label>
+            <select id="media-type" onchange="testSelect(this)">
+                <option value="">Todos</option>
+                <option value="IMAGE">Imagem</option>
+                <option value="VIDEO">Vídeo</option>
+                <option value="AUDIO">Áudio</option>
+                <option value="PDF">PDF</option>
+                <option value="DOCUMENT">Documento</option>
+            </select>
+            <div class="test-result">
+                ✅ Select para filtrar tipos de mídia
+            </div>
+        </div>
+    </div>
+
+    <h2>/admin/inbox — Filtros</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="inbox-status">Status da Conversa:</label>
+            <select id="inbox-status" onchange="testSelect(this)">
+                <option value="">Todas</option>
+                <option value="UNREAD">Não Lidas</option>
+                <option value="READ">Lidas</option>
+                <option value="ARCHIVED">Arquivadas</option>
+            </select>
+            <div class="test-result">
+                ✅ Select para filtrar conversas
+            </div>
+        </div>
+        <div class="form-group">
+            <label for="inbox-instance">Instância:</label>
+            <select id="inbox-instance" onchange="testSelect(this)">
+                <option value="">Todas</option>
+                <option value="inst1">Instância 1</option>
+                <option value="inst2">Instância 2</option>
+            </select>
+        </div>
+    </div>
+
+    <h2>/admin/settings — Configurações</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="settings-auth">Autenticação:</label>
+            <select id="settings-auth" onchange="testSelect(this)">
+                <option value="token">Token</option>
+                <option value="api-key">API Key</option>
+                <option value="oauth">OAuth</option>
+            </select>
+            <div class="test-result">
+                ✅ Select para escolher método de autenticação
+            </div>
+        </div>
+    </div>
+
+    <h2>/user/instances — Minhas Instâncias</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="user-instance-status">Status:</label>
+            <select id="user-instance-status" onchange="testSelect(this)">
+                <option value="">Todas</option>
+                <option value="CONNECTED">Conectada</option>
+                <option value="DISCONNECTED">Desconectada</option>
+                <option value="ERROR">Erro</option>
+            </select>
+            <div class="test-result">
+                ✅ Select para filtrar instâncias do usuário
+            </div>
+        </div>
+    </div>
+
+    <h2>Select Desativado (Teste)</h2>
+    <div class="section">
+        <div class="form-group">
+            <label for="disabled-select">Opção Desativada:</label>
+            <select id="disabled-select" disabled onchange="testSelect(this)">
+                <option value="">Selecione</option>
+                <option value="opt1">Opção 1</option>
+                <option value="opt2">Opção 2</option>
+            </select>
+            <div class="test-result">
+                ✅ Select desativado deve ter opacidade reduzida
+            </div>
+        </div>
+    </div>
+
+    <h2>📋 Checklist Visual</h2>
+    <div class="section">
+        <div id="checklist">
+            <p><strong>Para cada select acima, verifique:</strong></p>
+            <ul>
+                <li>✓ Background do select é escuro (não branco)</li>
+                <li>✓ Texto é legível (claro)</li>
+                <li>✓ Ao clicar, dropdown abre com fundo escuro</li>
+                <li>✓ Opções do dropdown são legíveis (texto claro em fundo escuro)</li>
+                <li>✓ Hover em opção muda cor (destaque visual)</li>
+                <li>✓ Opção selecionada tem cor neon roxo</li>
+                <li>✓ Focus no select mostra borda neon roxo</li>
+                <li>✓ Select desativado tem opacidade reduzida</li>
+                <li>✓ Console do navegador sem erros JavaScript</li>
+                <li>✓ Tema escuro é consistente em todas as rotas</li>
+            </ul>
+        </div>
+    </div>
+
+    <h2>🔍 Inspetores</h2>
+    <div class="section">
+        <button onclick="testAllSelects()">Testar Todos os Selects</button>
+        <button onclick="openConsole()">Abrir Console (F12)</button>
+        <button onclick="checkCSSRule()">Verificar CSS color-scheme</button>
+        <div id="inspector-result"></div>
+    </div>
+
+    <script>
+        function testSelect(element) {
+            console.log('Select clicado:', {
+                id: element.id,
+                value: element.value,
+                bgColor: window.getComputedStyle(element).backgroundColor,
+                color: window.getComputedStyle(element).color,
+                colorScheme: window.getComputedStyle(element).colorScheme,
+            });
+        }
+
+        function testAllSelects() {
+            const selects = document.querySelectorAll('select');
+            const results = [];
+
+            selects.forEach((select, idx) => {
+                const computed = window.getComputedStyle(select);
+                const style = {
+                    id: select.id || `select-${idx}`,
+                    value: select.value,
+                    backgroundColor: computed.backgroundColor,
+                    color: computed.color,
+                    colorScheme: computed.colorScheme,
+                    borderColor: computed.borderColor,
+                };
+                results.push(style);
+                console.log(`[${idx}]`, style);
+            });
+
+            const resultDiv = document.getElementById('inspector-result');
+            resultDiv.innerHTML = `
+                <h3>✅ Resultado dos ${selects.length} Selects:</h3>
+                <pre>${JSON.stringify(results, null, 2)}</pre>
+            `;
+        }
+
+        function openConsole() {
+            alert('Pressione F12 para abrir o console do navegador e verificar por erros');
+        }
+
+        function checkCSSRule() {
+            const bodyStyle = window.getComputedStyle(document.body);
+            const colorScheme = bodyStyle.colorScheme;
+            const bgColor = bodyStyle.backgroundColor;
+            const textColor = bodyStyle.color;
+
+            const resultDiv = document.getElementById('inspector-result');
+            resultDiv.innerHTML = `
+                <h3>🔍 CSS Verificado:</h3>
+                <ul>
+                    <li>Body color-scheme: <strong>${colorScheme}</strong></li>
+                    <li>Body background: <strong>${bgColor}</strong></li>
+                    <li>Body color (texto): <strong>${textColor}</strong></li>
+                </ul>
+                <p>✅ Se color-scheme = "dark", os selects usarão o tema escuro do navegador</p>
+            `;
+        }
+
+        // Log no console quando página carrega
+        console.log('%c🧪 Teste de Selects - ChipFire', 'font-size: 16px; color: #ff6d00; font-weight: bold;');
+        console.log('color-scheme CSS:', window.getComputedStyle(document.body).colorScheme);
+        console.log('Clique em um select para testar');
+    </script>
+</body>
+</html>

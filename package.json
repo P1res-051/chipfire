@@ -1,0 +1,24 @@
+{
+  "name": "evo-crm",
+  "private": true,
+  "version": "0.1.0",
+  "description": "EVO CRM — Central de Relacionamento WhatsApp com Evolution API",
+  "workspaces": [
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev:docker": "docker compose up -d --build",
+    "local:docker": "docker compose -f docker-compose.local.yml up -d --build",
+    "prod:docker": "docker compose -f docker-compose.prod.yml up -d --build",
+    "down": "docker compose down",
+    "down:local": "docker compose -f docker-compose.local.yml down",
+    "down:prod": "docker compose -f docker-compose.prod.yml down",
+    "logs:backend": "docker compose logs -f backend",
+    "logs:frontend": "docker compose logs -f frontend",
+    "backup": "bash ./infra/scripts/backup.sh",
+    "restore": "bash ./infra/scripts/restore.sh"
+  }
+}

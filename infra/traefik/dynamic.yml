@@ -1,0 +1,18 @@
+http:
+  middlewares:
+    security-headers:
+      headers:
+        sslRedirect: true
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        browserXssFilter: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: no-referrer
+        permissionsPolicy: "camera=(), microphone=(), geolocation=()"
+    rate-limit:
+      rateLimit:
+        average: 50
+        burst: 100
+

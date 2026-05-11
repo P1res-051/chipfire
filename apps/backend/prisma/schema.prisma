@@ -1,0 +1,521 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum InstanceStatus {
+  WAITING_QR
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  PAUSED
+}
+
+enum ContactStatus {
+  ACTIVE
+  INACTIVE
+  OPTOUT
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  STICKER
+  UNKNOWN
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  FINISHED
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  PDF
+  DOCUMENT
+  TEXT
+}
+
+enum ContentGroupType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  MIXED
+}
+
+enum ContentSelectionMode {
+  RANDOM
+  SEQUENTIAL
+  WEIGHTED_RANDOM
+  LEAST_USED
+}
+
+enum ContentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model User {
+  id                 String     @id @default(cuid())
+  name               String
+  email              String     @unique
+  passwordHash       String
+  role               UserRole   @default(USER)
+  status             UserStatus @default(ACTIVE)
+  instanceLimit      Int        @default(1)
+  notes              String?
+  mustChangePassword Boolean    @default(true)
+  lastLoginAt        DateTime?
+
+  instances     WhatsAppInstance[]
+  contacts      Contact[]
+  media         MediaLibrary[]
+  contentGroups ContentGroup[]
+  templates     MessageTemplate[]
+  campaigns     Campaign[]
+  typebotFlows  TypebotFlow[]
+  aiAgents      AiAgent[]
+  sessions      AuthSession[]
+  auditLogs     AuditLog[]
+  messageLogs   MessageLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuthSession {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  userAgent        String?
+  ipAddress        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model WhatsAppInstance {
+  id                    String         @id @default(cuid())
+  userId                String
+  instanceName          String
+  phoneNumber           String?
+  status                InstanceStatus @default(WAITING_QR)
+  qrCode                String?
+  provider              String         @default("EVOLUTION")
+  connectedAt           DateTime?
+  disconnectedAt        DateTime?
+  lastActivityAt        DateTime?
+  messagesSentToday     Int            @default(0)
+  messagesReceivedToday Int            @default(0)
+  totalMessagesSent     Int            @default(0)
+  totalMessagesReceived Int            @default(0)
+  errorCount            Int            @default(0)
+  optOutCount           Int            @default(0)
+  healthScore           Int            @default(0)
+  healthLabel           String         @default("Crítica")
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations     Conversation[]
+  messages          Message[]
+  healthSnapshots   HealthSnapshot[]
+  webhookEvents     WebhookEvent[]
+  messageLogs       MessageLog[]
+  campaignInstances CampaignInstance[]
+  aiAgentInstances  AiAgentInstance[]
+  typebotFlows      TypebotFlow[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, instanceName])
+  @@index([userId])
+  @@index([status])
+}
+
+model Contact {
+  id       String        @id @default(cuid())
+  userId   String
+  name     String
+  phone    String
+  tag      String?
+  optIn    Boolean       @default(false)
+  status   ContactStatus @default(ACTIVE)
+  source   String?
+  optOutAt DateTime?
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversations    Conversation[]
+  messages         Message[]
+  messageLogs      MessageLog[]
+  campaignContacts CampaignContact[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, phone])
+  @@index([userId])
+  @@index([status])
+  @@index([tag])
+}
+
+model Conversation {
+  id            String    @id @default(cuid())
+  instanceId    String
+  contactId     String
+  lastMessageAt DateTime?
+
+  instance WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  contact  Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([instanceId, contactId])
+  @@index([instanceId])
+  @@index([contactId])
+}
+
+model Message {
+  id                String           @id @default(cuid())
+  conversationId    String
+  contactId         String
+  instanceId        String
+  direction         MessageDirection
+  type              MessageType      @default(TEXT)
+  text              String?
+  raw               Json?
+  providerMessageId String?
+  occurredAt        DateTime         @default(now())
+
+  conversation Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  contact      Contact          @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  instance     WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([instanceId])
+  @@index([contactId])
+  @@index([occurredAt])
+}
+
+model MediaLibrary {
+  id        String    @id @default(cuid())
+  userId    String
+  name      String
+  slug      String
+  type      MediaType
+  filePath  String?
+  publicUrl String?
+  mimeType  String?
+  size      Int?
+  duration  Int?
+  tags      String[]
+
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  contentGroupItems ContentGroupItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+model ContentGroup {
+  id            String               @id @default(cuid())
+  createdById   String
+  name          String
+  slug          String
+  description   String?
+  type          ContentGroupType
+  selectionMode ContentSelectionMode @default(RANDOM)
+  status        ContentStatus        @default(ACTIVE)
+
+  createdBy User               @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  items     ContentGroupItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([createdById, slug])
+  @@index([createdById])
+  @@index([status])
+}
+
+model ContentGroupItem {
+  id          String           @id @default(cuid())
+  groupId     String
+  type        ContentGroupType
+  textContent String?
+  mediaId     String?
+  weight      Int              @default(1)
+  status      ContentStatus    @default(ACTIVE)
+  usageCount  Int              @default(0)
+  lastUsedAt  DateTime?
+
+  group ContentGroup  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  media MediaLibrary? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([groupId])
+  @@index([mediaId])
+  @@index([status])
+}
+
+model MessageTemplate {
+  id      String   @id @default(cuid())
+  userId  String
+  name    String
+  content String
+  tags    String[]
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaigns Campaign[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model TypebotFlow {
+  id           String  @id @default(cuid())
+  userId       String
+  instanceId   String?
+  name         String
+  description  String?
+  typebotUrl   String
+  triggerType  String
+  triggerValue String?
+  status       String  @default("ACTIVE")
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instance WhatsAppInstance? @relation(fields: [instanceId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([instanceId])
+}
+
+model AiAgent {
+  id           String  @id @default(cuid())
+  userId       String
+  name         String
+  systemPrompt String
+  tone         String?
+  rules        String?
+  model        String?
+  status       String  @default("DISABLED")
+
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instances AiAgentInstance[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model AiAgentInstance {
+  id         String @id @default(cuid())
+  agentId    String
+  instanceId String
+
+  agent    AiAgent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  instance WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, instanceId])
+}
+
+model Campaign {
+  id                    String         @id @default(cuid())
+  userId                String
+  name                  String
+  description           String?
+  contactTag            String?
+  templateId            String
+  mediaId               String?
+  allowedStartTime      String         @default("08:00")
+  allowedEndTime        String         @default("20:00")
+  dailyLimitPerInstance Int            @default(200)
+  intervalMinSeconds    Int            @default(15)
+  intervalMaxSeconds    Int            @default(60)
+  status                CampaignStatus @default(DRAFT)
+  maxErrorRatePercent   Int            @default(5)
+  maxOptOutRatePercent  Int            @default(2)
+
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template    MessageTemplate    @relation(fields: [templateId], references: [id])
+  contacts    CampaignContact[]
+  instances   CampaignInstance[]
+  messageLogs MessageLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+model CampaignContact {
+  id         String @id @default(cuid())
+  campaignId String
+  contactId  String
+
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  contact  Contact  @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, contactId])
+  @@index([campaignId])
+  @@index([contactId])
+}
+
+model CampaignInstance {
+  id         String @id @default(cuid())
+  campaignId String
+  instanceId String
+
+  campaign Campaign         @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  instance WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, instanceId])
+  @@index([campaignId])
+  @@index([instanceId])
+}
+
+model MessageLog {
+  id           String           @id @default(cuid())
+  userId       String
+  instanceId   String?
+  contactId    String?
+  campaignId   String?
+  direction    MessageDirection
+  status       String
+  errorType    String?
+  errorMessage String?
+  meta         Json?
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  instance WhatsAppInstance? @relation(fields: [instanceId], references: [id], onDelete: SetNull)
+  contact  Contact?          @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  campaign Campaign?         @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([instanceId])
+  @@index([contactId])
+  @@index([campaignId])
+}
+
+model WebhookEvent {
+  id         String   @id @default(cuid())
+  instanceId String?
+  eventType  String
+  raw        Json
+  receivedAt DateTime @default(now())
+
+  instance WhatsAppInstance? @relation(fields: [instanceId], references: [id], onDelete: SetNull)
+
+  @@index([instanceId])
+  @@index([eventType])
+  @@index([receivedAt])
+}
+
+model HealthSnapshot {
+  id         String   @id @default(cuid())
+  instanceId String
+  score      Int
+  label      String
+  details    Json?
+  day        DateTime
+
+  instance WhatsAppInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([instanceId])
+  @@index([day])
+}
+
+model GlobalSettings {
+  id                      String  @id @default("global")
+  evolutionApiUrlInternal String
+  evolutionApiUrlPublic   String
+  evolutionApiKeyHint     String?
+  evolutionWebhookBaseUrl String?
+  evolutionTimeoutMs      Int     @default(15000)
+  evolutionMaxRetries     Int     @default(3)
+
+  defaultDailyLimitPerInstance Int     @default(200)
+  defaultAllowedStartTime      String  @default("08:00")
+  defaultAllowedEndTime        String  @default("20:00")
+  defaultIntervalMinSeconds    Int     @default(15)
+  defaultIntervalMaxSeconds    Int     @default(60)
+  maxErrorRatePercent          Int     @default(5)
+  maxOptOutRatePercent         Int     @default(2)
+  maxMediaSizeMb               Int     @default(25)
+  autoPauseOnInstability       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String  @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  ipAddress String?
+  userAgent String?
+  meta      Json?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}

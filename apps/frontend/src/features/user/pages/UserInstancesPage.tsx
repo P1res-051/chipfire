@@ -1,0 +1,419 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { PlugZap, Plus, QrCode, RefreshCcw, Trash2, Unplug } from 'lucide-react'
+import * as React from 'react'
+import { useForm } from 'react-hook-form'
+import { z } from 'zod'
+
+import { ApiStatusPill } from '@/components/ApiStatusPill'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useToast } from '@/components/ui/toast'
+import { api } from '@/lib/api'
+import { formatDateTime } from '@/lib/format'
+import { getErrorMessage } from '@/lib/http'
+
+type InstanceStatus = 'WAITING_QR' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'PAUSED'
+
+type Instance = {
+  id: string
+  instanceName: string
+  phoneNumber: string | null
+  status: InstanceStatus
+  qrCode: string | null
+  messagesSentToday: number
+  messagesReceivedToday: number
+  healthScore: number
+  healthLabel: string
+  lastActivityAt: string | null
+  createdAt: string
+}
+
+const createSchema = z.object({
+  instanceName: z.string().min(2, 'Informe um nome'),
+  phoneNumber: z.string().optional(),
+})
+
+type CreateValues = z.infer<typeof createSchema>
+
+function statusBadge(status: InstanceStatus) {
+  switch (status) {
+    case 'CONNECTED':
+      return <Badge variant="success">CONNECTED</Badge>
+    case 'WAITING_QR':
+      return <Badge variant="warning">WAITING_QR</Badge>
+    case 'DISCONNECTED':
+      return <Badge variant="outline">DISCONNECTED</Badge>
+    case 'PAUSED':
+      return <Badge variant="outline">PAUSED</Badge>
+    default:
+      return <Badge variant="destructive">ERROR</Badge>
+  }
+}
+
+export function UserInstancesPage() {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  const instances = useQuery({
+    queryKey: ['user', 'instances'],
+    queryFn: async () => {
+      const { data } = await api.get('/instances')
+      return data as Instance[]
+    },
+  })
+
+  const metrics = React.useMemo(() => {
+    const list = instances.data ?? []
+    const total = list.length
+    const connected = list.filter((i) => i.status === 'CONNECTED').length
+    const waitingQr = list.filter((i) => i.status === 'WAITING_QR').length
+    const disconnected = list.filter((i) => i.status === 'DISCONNECTED').length
+    const errors = list.filter((i) => i.status === 'ERROR').length
+    const healthAvg = total
+      ? Math.round(list.reduce((acc, i) => acc + (i.healthScore ?? 0), 0) / total)
+      : 0
+    return { total, connected, waitingQr, disconnected, errors, healthAvg }
+  }, [instances.data])
+
+  const [createOpen, setCreateOpen] = React.useState(false)
+  const [qrOpen, setQrOpen] = React.useState(false)
+  const [qrValue, setQrValue] = React.useState<string | null>(null)
+  const [qrTitle, setQrTitle] = React.useState<string>('QR Code')
+  const [qrError, setQrError] = React.useState<string | null>(null)
+  const [qrImageSrc, setQrImageSrc] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    let cancelled = false
+
+    async function build() {
+      if (!qrValue) {
+        setQrImageSrc(null)
+        return
+      }
+
+      const isDataUrl = qrValue.startsWith('data:image')
+      const isHttp = qrValue.startsWith('http')
+      const looksBase64 = qrValue.length > 80 && /^[A-Za-z0-9+/=]+$/.test(qrValue)
+
+      if (isDataUrl) return setQrImageSrc(qrValue)
+      if (isHttp) return setQrImageSrc(qrValue)
+      if (looksBase64) return setQrImageSrc(`data:image/png;base64,${qrValue}`)
+
+      try {
+        const qr = await import('qrcode')
+        const url = await qr.toDataURL(qrValue, { margin: 1, width: 320 })
+        if (!cancelled) setQrImageSrc(url)
+      } catch {
+        if (!cancelled) setQrImageSrc(null)
+      }
+    }
+
+    build()
+    return () => {
+      cancelled = true
+    }
+  }, [qrValue])
+
+  const createForm = useForm<CreateValues>({
+    resolver: zodResolver(createSchema),
+    defaultValues: { instanceName: '', phoneNumber: '' },
+  })
+
+  const createInstance = useMutation({
+    mutationFn: async (values: CreateValues) => {
+      const { data } = await api.post('/instances', {
+        instanceName: values.instanceName,
+        phoneNumber: values.phoneNumber?.trim() || undefined,
+      })
+      return data as Instance
+    },
+    onSuccess: async () => {
+      toast({ title: 'Instância criada', variant: 'success' })
+      setCreateOpen(false)
+      createForm.reset()
+      await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    },
+    onError: (e) =>
+      toast({ title: 'Falha ao criar instância', description: getErrorMessage(e), variant: 'destructive' }),
+  })
+
+  const fetchQr = useMutation({
+    mutationFn: async (instance: Instance) => {
+      const { data } = await api.get(`/instances/${instance.id}/qrcode`)
+      return data as { success: boolean; qrcode?: string; code?: string; message?: string }
+    },
+    onSuccess: (data) => {
+      setQrError(!data.success ? data.message ?? 'QR Code não disponível' : null)
+      setQrValue(data.qrcode ?? data.code ?? null)
+      setQrOpen(true)
+    },
+    onError: (e) =>
+      toast({ title: 'Falha ao obter QR Code', description: getErrorMessage(e), variant: 'destructive' }),
+  })
+
+  const fetchStatus = useMutation({
+    mutationFn: async (instance: Instance) => {
+      const { data } = await api.get(`/instances/${instance.id}/status`)
+      return data as { providerState: string }
+    },
+    onSuccess: (data) =>
+      toast({ title: 'Status do provedor', description: data.providerState, variant: 'success' }),
+    onError: (e) =>
+      toast({ title: 'Falha ao consultar status', description: getErrorMessage(e), variant: 'destructive' }),
+  })
+
+  const reconnect = useMutation({
+    mutationFn: async (instance: Instance) => {
+      const { data } = await api.put(`/instances/${instance.id}/reconnect`)
+      return data as any
+    },
+    onSuccess: async () => {
+      toast({ title: 'Reconectando…', variant: 'success' })
+      await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    },
+    onError: (e) => toast({ title: 'Falha ao reconectar', description: getErrorMessage(e), variant: 'destructive' }),
+  })
+
+  const disconnect = useMutation({
+    mutationFn: async (instance: Instance) => {
+      const { data } = await api.put(`/instances/${instance.id}/disconnect`)
+      return data as any
+    },
+    onSuccess: async () => {
+      toast({ title: 'Instância desconectada', variant: 'success' })
+      await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    },
+    onError: (e) => toast({ title: 'Falha ao desconectar', description: getErrorMessage(e), variant: 'destructive' }),
+  })
+
+  const remove = useMutation({
+    mutationFn: async (instance: Instance) => {
+      const { data } = await api.delete(`/instances/${instance.id}`)
+      return data as { ok: boolean }
+    },
+    onSuccess: async () => {
+      toast({ title: 'Instância removida', variant: 'success' })
+      await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    },
+    onError: (e) => toast({ title: 'Falha ao remover', description: getErrorMessage(e), variant: 'destructive' }),
+  })
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold">Minhas instâncias</h1>
+            <ApiStatusPill />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Crie instâncias, pegue o QR Code e gerencie conexão.
+          </p>
+        </div>
+        <Button onClick={() => setCreateOpen(true)}>
+          <Plus /> Nova instância
+        </Button>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-5">
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Total</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.total}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Conectadas</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.connected}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Aguardando QR</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.waitingQr}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Desconectadas</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.disconnected}</CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="py-3">
+            <CardTitle className="text-sm">Saúde média</CardTitle>
+          </CardHeader>
+          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : `${metrics.healthAvg}%`}</CardContent>
+        </Card>
+      </div>
+
+      <Card>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle>Lista</CardTitle>
+          <div className="text-sm text-muted-foreground">
+            {instances.isPending ? 'Carregando…' : `${instances.data?.length ?? 0} registros`}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {instances.isError ? (
+            <div className="text-sm text-destructive">{getErrorMessage(instances.error)}</div>
+          ) : null}
+
+          <Table className="mt-2">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Instância</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Msgs hoje</TableHead>
+                <TableHead>Saúde</TableHead>
+                <TableHead>Última atividade</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {(instances.data ?? []).map((i) => (
+                <TableRow key={i.id}>
+                  <TableCell className="font-medium">{i.instanceName}</TableCell>
+                  <TableCell>{statusBadge(i.status)}</TableCell>
+                  <TableCell className="text-muted-foreground">{i.phoneNumber ?? '—'}</TableCell>
+                  <TableCell>{(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {i.healthScore ?? 0}% · {i.healthLabel}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{formatDateTime(i.lastActivityAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setQrTitle(`QR Code · ${i.instanceName}`)
+                          fetchQr.mutate(i)
+                        }}
+                        disabled={fetchQr.isPending}
+                      >
+                        <QrCode /> QR
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => fetchStatus.mutate(i)} disabled={fetchStatus.isPending}>
+                        <RefreshCcw /> Status
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const ok = window.confirm(`Desconectar a instância "${i.instanceName}"?`)
+                          if (!ok) return
+                          disconnect.mutate(i)
+                        }}
+                        disabled={disconnect.isPending}
+                      >
+                        <Unplug /> Disconnect
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const ok = window.confirm(`Reconectar a instância "${i.instanceName}"?`)
+                          if (!ok) return
+                          reconnect.mutate(i)
+                        }}
+                        disabled={reconnect.isPending}
+                      >
+                        <PlugZap /> Reconnect
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
+                          const ok = window.confirm(`Remover instância "${i.instanceName}"?`)
+                          if (ok) remove.mutate(i)
+                        }}
+                        disabled={remove.isPending}
+                      >
+                        <Trash2 /> Remover
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {!instances.isPending && (instances.data?.length ?? 0) === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
+                    Nenhuma instância encontrada.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent title="Nova instância" description="Cria a instância na Evolution API para seu usuário.">
+          <form className="space-y-4" onSubmit={createForm.handleSubmit((v) => createInstance.mutate(v))}>
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Nome da instância</label>
+                <Input {...createForm.register('instanceName')} />
+                {createForm.formState.errors.instanceName?.message ? (
+                  <p className="text-sm text-red-400">{createForm.formState.errors.instanceName.message}</p>
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Telefone (opcional)</label>
+                <Input placeholder="5511999999999" {...createForm.register('phoneNumber')} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={createInstance.isPending}>
+                {createInstance.isPending ? 'Criando…' : 'Criar'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent title={qrTitle} description="Use este QR Code para conectar o WhatsApp.">
+          {qrError ? (
+            <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+              {qrError}
+            </div>
+          ) : null}
+
+          {qrValue ? (
+            <div className="space-y-3">
+              {qrImageSrc ? (
+                <img
+                  alt="QR Code"
+                  className="mx-auto max-h-[320px] rounded-lg border bg-white p-3"
+                  src={qrImageSrc}
+                />
+              ) : (
+                <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
+                  Código recebido (não foi possível renderizar imagem):
+                  <pre className="mt-2 overflow-auto text-xs">{qrValue}</pre>
+                </div>
+              )}
+              <pre className="max-h-40 overflow-auto rounded-lg border bg-secondary/30 p-3 text-xs">
+                {qrValue}
+              </pre>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Sem QR Code retornado.</div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

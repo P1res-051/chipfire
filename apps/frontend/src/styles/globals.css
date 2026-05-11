@@ -1,0 +1,92 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ChipFire Dark Premium Base */
+    --background: 240 10% 4%;
+    --foreground: 210 40% 98%;
+    --card: 240 10% 7%;
+    --card-foreground: 210 40% 98%;
+    --popover: 240 10% 7%;
+    --popover-foreground: 210 40% 98%;
+    
+    /* ChipFire Primary: Laranja Fire */
+    --primary: 24 98% 52%;
+    --primary-foreground: 210 40% 98%;
+    
+    /* ChipFire Secondary: Cinza */
+    --secondary: 240 6% 14%;
+    --secondary-foreground: 210 40% 98%;
+    
+    /* Muted */
+    --muted: 240 6% 14%;
+    --muted-foreground: 215 20% 65%;
+    
+    /* ChipFire Accent: Roxo Premium */
+    --accent: 270 85% 60%;
+    --accent-foreground: 210 40% 98%;
+    
+    /* Functional */
+    --destructive: 0 84% 60%;
+    --success: 142 76% 45%;
+    --warning: 38 92% 50%;
+    --info: 198 88% 52%;
+    
+    /* Border & Input */
+    --border: 240 8% 20%;
+    --input: 240 8% 20%;
+    --ring: 24 98% 52%;
+    
+    --radius: 12px;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    color-scheme: dark;
+  }
+}
+
+@layer utilities {
+  .bg-grid {
+    background-image: radial-gradient(rgba(255, 109, 0, 0.12) 1px, transparent 0);
+    background-size: 20px 20px;
+  }
+
+  .neon-border {
+    box-shadow: 0 0 0 1px rgba(255, 109, 0, 0.3), 0 0 20px rgba(255, 109, 0, 0.12);
+  }
+
+  .glow-orange {
+    box-shadow: 0 0 0 1px rgba(255, 109, 0, 0.3), 0 0 20px rgba(255, 109, 0, 0.15);
+  }
+
+  .glow-purple {
+    box-shadow: 0 0 0 1px rgba(199, 125, 255, 0.3), 0 0 20px rgba(199, 125, 255, 0.12);
+  }
+}
+
+/* Dark mode select elements */
+select,
+textarea,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="url"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  color-scheme: dark;
+}
+
+select option {
+  background-color: hsl(240, 10%, 9%);
+  color: hsl(210, 40%, 98%);
+}
+
+select option:checked {
+  background-color: hsl(24, 98%, 52%);
+  color: hsl(210, 40%, 98%);
+}

@@ -1,0 +1,194 @@
+name: evo-crm
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./infra/docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    networks:
+      - internal
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - internal
+
+  evolution-api:
+    # Fix QR Code generation issues seen in v2.2.x ("connect" returning {"count":0} + loop de logs).
+    # Pinned to a known-good newer tag.
+    image: evoapicloud/evolution-api:v2.3.7
+    environment:
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_KEY}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: "postgresql"
+      DATABASE_CONNECTION_URI: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/evolution?schema=public"
+      DATABASE_CONNECTION_CLIENT_NAME: "evolution_exchange"
+      DATABASE_SAVE_DATA_INSTANCE: "true"
+      DATABASE_SAVE_DATA_NEW_MESSAGE: "true"
+      DATABASE_SAVE_MESSAGE_UPDATE: "true"
+      # Workaround recomendado pela comunidade para casos onde o QR não é gerado (connect -> {"count":0})
+      # Fonte: meta-issue “QR Code / pairing” (Evolution API).
+      DATABASE_SAVE_DATA_CONTACTS: "false"
+      DATABASE_SAVE_DATA_CHATS: "false"
+      DATABASE_SAVE_DATA_LABELS: "false"
+      DATABASE_SAVE_DATA_HISTORIC: "false"
+      # Redis cache (recomendado/necessário em v2 para estabilizar sessão/QR)
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: "redis://redis:6379/6"
+      CACHE_REDIS_PREFIX_KEY: "evolution"
+      CACHE_REDIS_SAVE_INSTANCES: "true"
+      CACHE_LOCAL_ENABLED: "false"
+      # Manter alinhado ao whatsappWebVersion reportado pela própria API (GET /)
+      CONFIG_SESSION_PHONE_VERSION: "2.3000.1027934701"
+    ports:
+      - "8080:8080"
+    volumes:
+      - evolution_store:/evolution/store
+      - evolution_instances:/evolution/instances
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget -q -O- http://127.0.0.1:8080 >/dev/null 2>&1 || exit 1",
+        ]
+      interval: 15s
+      timeout: 30s
+      retries: 20
+    restart: unless-stopped
+    # Precisa de acesso à internet para gerar QR/conectar ao WhatsApp.
+    # A rede `internal` é marcada como `internal: true` e bloqueia egress; então adicionamos `public`.
+    networks:
+      - internal
+      - public
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+      target: dev
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      EVOLUTION_API_URL_INTERNAL: ${EVOLUTION_API_URL_INTERNAL}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_BUCKET: ${MINIO_BUCKET}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ./apps/backend:/app
+      - backend_node_modules:/app/node_modules
+      - ./storage/uploads:/app/storage/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      evolution-api:
+        condition: service_healthy
+      minio:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://localhost:3000/api/health',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+    networks:
+      - internal
+      - public
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        VITE_API_URL: ${API_URL}
+        VITE_APP_URL: ${APP_URL}
+    env_file:
+      - .env
+    environment:
+      VITE_API_URL: ${API_URL}
+      VITE_APP_URL: ${APP_URL}
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    volumes:
+      - ./apps/frontend:/app
+      - frontend_node_modules:/app/node_modules
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - public
+
+networks:
+  internal:
+    driver: bridge
+    internal: true
+  public:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  evolution_store:
+  evolution_instances:
+  backend_node_modules:
+  frontend_node_modules:

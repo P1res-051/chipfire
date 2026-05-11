@@ -1,0 +1,99 @@
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { InstanceStatus, UserRole } from '@prisma/client';
+
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import type { JwtPayload } from '../auth/jwt.payload';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { AuditService } from '../audit/audit.service';
+import { CreateInstanceDto } from './dto/create-instance.dto';
+import { AdminCreateInstanceDto } from './dto/admin-create-instance.dto';
+import { InstancesService } from './instances.service';
+
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Controller('instances')
+export class InstancesController {
+  constructor(
+    private readonly instances: InstancesService,
+    private readonly audit: AuditService,
+  ) {}
+
+  @Get()
+  list(
+    @CurrentUser() user: JwtPayload,
+    @Query('userId') userId?: string,
+    @Query('status') status?: InstanceStatus,
+  ) {
+    if (user.role === UserRole.ADMIN) {
+      return this.instances.listAdmin({ userId, status });
+    }
+    return this.instances.listForUser(user);
+  }
+
+  @Roles(UserRole.USER)
+  @Post()
+  async create(@Req() req: any, @CurrentUser() user: JwtPayload, @Body() dto: CreateInstanceDto) {
+    const created = await this.instances.createForUser(user.sub, {
+      instanceName: dto.instanceName,
+      phoneNumber: dto.phoneNumber,
+    });
+
+    await this.audit.log({
+      userId: user.sub,
+      action: 'USER_INSTANCE_CREATE',
+      entity: 'WhatsAppInstance',
+      entityId: created.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      meta: { instanceName: created.instanceName },
+    });
+    return created;
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Post('admin')
+  async adminCreate(@Req() req: any, @CurrentUser() actor: JwtPayload, @Body() dto: AdminCreateInstanceDto) {
+    const created = await this.instances.adminCreateForUser({
+      userId: dto.userId,
+      instanceName: dto.instanceName,
+      phoneNumber: dto.phoneNumber,
+    });
+
+    await this.audit.log({
+      userId: actor.sub,
+      action: 'ADMIN_INSTANCE_CREATE',
+      entity: 'WhatsAppInstance',
+      entityId: created.id,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      meta: { userId: dto.userId, instanceName: created.instanceName },
+    });
+    return created;
+  }
+
+  @Get(':id/qrcode')
+  getQr(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.instances.getQRCode(user, id);
+  }
+
+  @Get(':id/status')
+  getStatus(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.instances.getStatus(user, id);
+  }
+
+  @Put(':id/reconnect')
+  reconnect(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.instances.reconnect(user, id);
+  }
+
+  @Put(':id/disconnect')
+  disconnect(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.instances.disconnect(user, id);
+  }
+
+  @Delete(':id')
+  delete(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.instances.delete(user, id);
+  }
+}
