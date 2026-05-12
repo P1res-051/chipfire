@@ -1,165 +1,134 @@
 #Requires -Version 5.1
-<#
-.SYNOPSIS
-    Build e push das imagens Docker do ChipFire para o Docker Hub.
-.DESCRIPTION
-    Lê a versão atual do arquivo VERSION, incrementa o patch (ex: 1.0.4 -> 1.0.5),
-    builda backend e/ou frontend, faz push com a nova tag e atualiza :latest.
-.PARAMETER Service
-    Qual serviço buildar: "backend", "frontend" ou "all" (padrão: all)
-.PARAMETER Minor
-    Incrementa o minor em vez do patch (ex: 1.0.4 -> 1.1.0)
-.PARAMETER Major
-    Incrementa o major em vez do patch (ex: 1.0.4 -> 2.0.0)
-.EXAMPLE
-    .\build-push.ps1
-    .\build-push.ps1 -Service backend
-    .\build-push.ps1 -Service frontend
-    .\build-push.ps1 -Minor
-#>
 param(
     [ValidateSet("all", "backend", "frontend")]
     [string]$Service = "all",
-
     [switch]$Minor,
     [switch]$Major
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
-# ─── Configuração ────────────────────────────────────────────────────────────
-$REGISTRY   = "alecmoura10"
-$VERSION_FILE = "$PSScriptRoot\VERSION"
+# --- Configuracao -------------------------------------------------------
+$REGISTRY        = "alecmoura10"
+$VERSION_FILE    = "$PSScriptRoot\VERSION"
+$VITE_API_URL    = "https://chipfire-api.automation.app.br/api"
+$VITE_APP_URL    = "https://chipfire.automation.app.br"
+$BACKEND_CTX     = "$PSScriptRoot\apps\backend"
+$FRONTEND_CTX    = "$PSScriptRoot\apps\frontend"
 
-# URLs baked no build do frontend — ajustar se o domínio mudar
-$VITE_API_URL = "https://chipfire-api.automation.app.br/api"
-$VITE_APP_URL = "https://chipfire.automation.app.br"
-
-# ─── Funções utilitárias ─────────────────────────────────────────────────────
-function Write-Step([string]$msg) {
-    Write-Host "`n==> $msg" -ForegroundColor Cyan
+# --- Helpers ------------------------------------------------------------
+function Step([string]$msg) {
+    Write-Host ""
+    Write-Host "==> $msg" -ForegroundColor Cyan
 }
 
-function Write-OK([string]$msg) {
+function OK([string]$msg) {
     Write-Host "    [OK] $msg" -ForegroundColor Green
 }
 
-function Write-Fail([string]$msg) {
+function Fail([string]$msg) {
     Write-Host "    [ERRO] $msg" -ForegroundColor Red
     exit 1
 }
 
-function Invoke-Docker([string[]]$args) {
-    & docker @args
-    if ($LASTEXITCODE -ne 0) { Write-Fail "docker $($args[0]) falhou (exit $LASTEXITCODE)" }
+function Run-Docker {
+    # Recebe argumentos via $args automatico do PowerShell (nao use parametro nomeado)
+    $proc = Start-Process -FilePath "docker" `
+        -ArgumentList $args `
+        -NoNewWindow -Wait -PassThru
+    if ($proc.ExitCode -ne 0) {
+        Fail "docker $($args[0]) falhou (exit $($proc.ExitCode))"
+    }
 }
 
-# ─── Versão ──────────────────────────────────────────────────────────────────
-Write-Step "Calculando próxima versão"
+# --- Versao -------------------------------------------------------------
+Step "Calculando proxima versao"
 
-if (-not (Test-Path $VERSION_FILE)) {
-    "1.0.0" | Set-Content $VERSION_FILE
-}
+if (-not (Test-Path $VERSION_FILE)) { "1.0.0" | Set-Content $VERSION_FILE }
 
-$currentVersion = (Get-Content $VERSION_FILE).Trim()
-$parts = $currentVersion -split '\.'
-if ($parts.Count -ne 3) { Write-Fail "Formato inválido em VERSION: '$currentVersion' (esperado: X.Y.Z)" }
+$current = (Get-Content $VERSION_FILE -Raw).Trim()
+$parts   = $current -split '\.'
+if ($parts.Count -ne 3) { Fail "Formato invalido em VERSION: '$current' (esperado X.Y.Z)" }
 
-[int]$maj = $parts[0]
-[int]$min = $parts[1]
-[int]$pat = $parts[2]
+[int]$maj = $parts[0]; [int]$min = $parts[1]; [int]$pat = $parts[2]
 
-if ($Major) { $maj++; $min = 0; $pat = 0 }
+if     ($Major) { $maj++; $min = 0; $pat = 0 }
 elseif ($Minor) { $min++; $pat = 0 }
-else { $pat++ }
+else            { $pat++ }
 
-$newVersion  = "$maj.$min.$pat"
-$newTag      = "v$newVersion"
+$newVersion = "$maj.$min.$pat"
+$newTag     = "v$newVersion"
 
-Write-Host "    Versão atual : v$currentVersion"
-Write-Host "    Nova versão  : $newTag" -ForegroundColor Yellow
+Write-Host "    Versao atual : v$current"
+Write-Host "    Nova versao  : $newTag" -ForegroundColor Yellow
 
-# ─── Verificar Docker rodando ─────────────────────────────────────────────────
-Write-Step "Verificando Docker Desktop"
-$dockerInfo = docker info 2>&1
-if ($LASTEXITCODE -ne 0) { Write-Fail "Docker não está rodando. Abra o Docker Desktop." }
-Write-OK "Docker OK"
+# --- Docker OK? ---------------------------------------------------------
+Step "Verificando Docker Desktop"
+$null = docker info 2>&1
+if ($LASTEXITCODE -ne 0) { Fail "Docker nao esta rodando. Abra o Docker Desktop." }
+OK "Docker OK"
 
-# ─── Build backend ───────────────────────────────────────────────────────────
+# --- Backend ------------------------------------------------------------
 if ($Service -eq "all" -or $Service -eq "backend") {
-    Write-Step "Build backend  →  $REGISTRY/chipfire-backend:$newTag"
-
-    $backendCtx = "$PSScriptRoot\apps\backend"
-    $backendDockerfile = "$backendCtx\Dockerfile"
+    Step "Build backend  ->  ${REGISTRY}/chipfire-backend:${newTag}"
 
     $env:DOCKER_BUILDKIT = "0"
-    Invoke-Docker @(
-        "build",
-        "--target", "prod",
-        "-t", "$REGISTRY/chipfire-backend:$newTag",
-        "-t", "$REGISTRY/chipfire-backend:latest",
-        "-f", $backendDockerfile,
-        $backendCtx
-    )
 
-    Write-OK "Backend buildado: $REGISTRY/chipfire-backend:$newTag"
+    Run-Docker "build" "--target" "prod" `
+        "-t" "${REGISTRY}/chipfire-backend:${newTag}" `
+        "-t" "${REGISTRY}/chipfire-backend:latest" `
+        "-f" "$BACKEND_CTX\Dockerfile" `
+        $BACKEND_CTX
 
-    Write-Step "Push backend"
-    Invoke-Docker @("push", "$REGISTRY/chipfire-backend:$newTag")
-    Invoke-Docker @("push", "$REGISTRY/chipfire-backend:latest")
-    Write-OK "Push concluído: $REGISTRY/chipfire-backend:$newTag + :latest"
+    OK "Backend buildado"
+
+    Step "Push backend"
+    Run-Docker "push" "${REGISTRY}/chipfire-backend:${newTag}"
+    Run-Docker "push" "${REGISTRY}/chipfire-backend:latest"
+    OK "Push: ${REGISTRY}/chipfire-backend:${newTag} + :latest"
 }
 
-# ─── Build frontend ──────────────────────────────────────────────────────────
+# --- Frontend -----------------------------------------------------------
 if ($Service -eq "all" -or $Service -eq "frontend") {
-    Write-Step "Build frontend  →  $REGISTRY/chipfire-frontend:$newTag"
+    Step "Build frontend  ->  ${REGISTRY}/chipfire-frontend:${newTag}"
     Write-Host "    VITE_API_URL = $VITE_API_URL"
     Write-Host "    VITE_APP_URL = $VITE_APP_URL"
 
-    $frontendCtx = "$PSScriptRoot\apps\frontend"
-    $frontendDockerfile = "$frontendCtx\Dockerfile"
-
     $env:DOCKER_BUILDKIT = "0"
-    Invoke-Docker @(
-        "build",
-        "--target", "prod",
-        "--build-arg", "VITE_API_URL=$VITE_API_URL",
-        "--build-arg", "VITE_APP_URL=$VITE_APP_URL",
-        "-t", "$REGISTRY/chipfire-frontend:$newTag",
-        "-t", "$REGISTRY/chipfire-frontend:latest",
-        "-f", $frontendDockerfile,
-        $frontendCtx
-    )
 
-    Write-OK "Frontend buildado: $REGISTRY/chipfire-frontend:$newTag"
+    Run-Docker "build" "--target" "prod" `
+        "--build-arg" "VITE_API_URL=$VITE_API_URL" `
+        "--build-arg" "VITE_APP_URL=$VITE_APP_URL" `
+        "-t" "${REGISTRY}/chipfire-frontend:${newTag}" `
+        "-t" "${REGISTRY}/chipfire-frontend:latest" `
+        "-f" "$FRONTEND_CTX\Dockerfile" `
+        $FRONTEND_CTX
 
-    Write-Step "Push frontend"
-    Invoke-Docker @("push", "$REGISTRY/chipfire-frontend:$newTag")
-    Invoke-Docker @("push", "$REGISTRY/chipfire-frontend:latest")
-    Write-OK "Push concluído: $REGISTRY/chipfire-frontend:$newTag + :latest"
+    OK "Frontend buildado"
+
+    Step "Push frontend"
+    Run-Docker "push" "${REGISTRY}/chipfire-frontend:${newTag}"
+    Run-Docker "push" "${REGISTRY}/chipfire-frontend:latest"
+    OK "Push: ${REGISTRY}/chipfire-frontend:${newTag} + :latest"
 }
 
-# ─── Atualizar VERSION ───────────────────────────────────────────────────────
-Write-Step "Atualizando arquivo VERSION"
+# --- Salvar versao -------------------------------------------------------
+Step "Atualizando VERSION"
 $newVersion | Set-Content $VERSION_FILE
-Write-OK "VERSION atualizado para $newVersion"
+OK "VERSION -> $newVersion"
 
-# ─── Resumo ──────────────────────────────────────────────────────────────────
+# --- Resumo -------------------------------------------------------------
 Write-Host ""
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
-Write-Host "  Build e push concluídos!" -ForegroundColor Green
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Green
+Write-Host "----------------------------------------------------" -ForegroundColor Green
+Write-Host "  Build e push concluidos!" -ForegroundColor Green
+Write-Host "----------------------------------------------------" -ForegroundColor Green
 
 if ($Service -eq "all" -or $Service -eq "backend") {
-    Write-Host "  Backend  : $REGISTRY/chipfire-backend:$newTag"
+    Write-Host "  Backend  : ${REGISTRY}/chipfire-backend:${newTag}"
 }
 if ($Service -eq "all" -or $Service -eq "frontend") {
-    Write-Host "  Frontend : $REGISTRY/chipfire-frontend:$newTag"
+    Write-Host "  Frontend : ${REGISTRY}/chipfire-frontend:${newTag}"
 }
-Write-Host "  Próxima versão base: $newVersion"
-Write-Host ""
-Write-Host "  Para atualizar o cluster k8s (SP):" -ForegroundColor Yellow
-Write-Host "  kubectl set image deployment/chipfire-backend backend=$REGISTRY/chipfire-backend:$newTag -n pires"
-Write-Host "  kubectl set image deployment/chipfire-frontend frontend=$REGISTRY/chipfire-frontend:$newTag -n pires"
 Write-Host ""
