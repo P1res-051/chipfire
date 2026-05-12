@@ -37,7 +37,7 @@ openssl rand -hex 32      # EVOLUTION_WEBHOOK_SECRET
 Preencher:
 - `POSTGRES_PASSWORD` → senha do usuário `evo` no pg-sp1
 - `DATABASE_ADMIN_URL` → `postgresql://postgres:SENHA@chipfire-postgres:5432/postgres`
-- Imagens Docker Hub já configuradas: `alecmoura10/chipfire-backend:v1.0.0` e `alecmoura10/chipfire-frontend:v1.0.0`
+- Imagens Docker Hub já configuradas: `p1res051/chipfire-backend:v1.0.0` e `p1res051/chipfire-frontend:v1.0.0`
 
 ## Passo 3 — (Opcional) Selar os secrets com Sealed Secrets
 

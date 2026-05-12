@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # --- Configuracao -------------------------------------------------------
-$REGISTRY        = "alecmoura10"
+$REGISTRY        = "p1res051"
 $VERSION_FILE    = "$PSScriptRoot\VERSION"
 $VITE_API_URL    = "https://chipfire-api.automation.app.br/api"
 $VITE_APP_URL    = "https://chipfire.automation.app.br"
@@ -34,12 +34,15 @@ function Fail([string]$msg) {
 }
 
 function Run-Docker {
-    # Recebe argumentos via $args automatico do PowerShell (nao use parametro nomeado)
-    $proc = Start-Process -FilePath "docker" `
-        -ArgumentList $args `
-        -NoNewWindow -Wait -PassThru
-    if ($proc.ExitCode -ne 0) {
-        Fail "docker $($args[0]) falhou (exit $($proc.ExitCode))"
+    param(
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string[]]$DockerArgs
+    )
+
+    # Chamar diretamente evita problemas de quoting/ArgumentList (principalmente no argumento de contexto do build).
+    & docker @DockerArgs
+    if ($LASTEXITCODE -ne 0) {
+        Fail "docker $($DockerArgs[0]) falhou (exit $LASTEXITCODE)"
     }
 }
 

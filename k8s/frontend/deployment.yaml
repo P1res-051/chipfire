@@ -1,4 +1,4 @@
-# Imagem publicada em: docker.io/alecmoura10/chipfire-frontend
+# Imagem publicada em: docker.io/p1res051/chipfire-frontend
 # Build: DOCKER_BUILDKIT=0, --target prod, Nginx 1.27-alpine
 # Baked: VITE_API_URL=https://chipfire-api.automation.app.br/api
 #        VITE_APP_URL=https://chipfire.automation.app.br
@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: alecmoura10/chipfire-frontend:v1.0.0
+          image: p1res051/chipfire-frontend:v1.0.0
           ports:
             - name: http
               containerPort: 80

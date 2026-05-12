@@ -1,4 +1,4 @@
-# Imagem publicada em: docker.io/alecmoura10/chipfire-backend
+# Imagem publicada em: docker.io/p1res051/chipfire-backend
 # Build: DOCKER_BUILDKIT=0, --target prod, Node 22-alpine
 apiVersion: apps/v1
 kind: Deployment
@@ -21,7 +21,7 @@ spec:
     spec:
       initContainers:
         - name: prisma-migrate
-          image: alecmoura10/chipfire-backend:v1.0.4
+          image: p1res051/chipfire-backend:v1.0.4
           command: ["npx", "prisma", "migrate", "deploy"]
           env:
             - name: DATABASE_URL
@@ -32,7 +32,7 @@ spec:
 
       containers:
         - name: backend
-          image: alecmoura10/chipfire-backend:v1.0.4
+          image: p1res051/chipfire-backend:v1.0.4
           ports:
             - name: http
               containerPort: 3000
