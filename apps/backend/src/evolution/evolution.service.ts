@@ -10,6 +10,7 @@ export class EvolutionService {
   private readonly logger = new Logger(EvolutionService.name);
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private readonly webhookSecret: string;
 
   constructor(
     private readonly http: HttpService,
@@ -17,6 +18,7 @@ export class EvolutionService {
   ) {
     this.baseUrl = config.get('EVOLUTION_API_URL_INTERNAL', { infer: true });
     this.apiKey = config.get('EVOLUTION_API_KEY', { infer: true });
+    this.webhookSecret = config.get('EVOLUTION_WEBHOOK_SECRET', { infer: true });
   }
 
   private headers() {
@@ -55,17 +57,14 @@ export class EvolutionService {
       integration: 'WHATSAPP-BAILEYS',
     };
     if (params.number) body.number = params.number;
-    if (params.webhook) {
-      body.webhook = params.webhook;
-      body.webhook_by_events = true;
-      body.events = ['QRCODE_UPDATED', 'CONNECTION_UPDATE'];
-    }
+    // Nota: webhook NÃO vai no /instance/create — a Evolution API v2 retorna 400
+    // quando os campos webhook_by_events/events estão no payload de criação.
+    // O webhook é registrado separadamente via setWebhook() após a criação.
 
     try {
       const res = await firstValueFrom(
         this.http.post(`${this.baseUrl}/instance/create`, body, {
           headers: { ...this.headers(), 'Content-Type': 'application/json' },
-          // A criação pode demorar (seed de sessão/arquivos). 15s causa timeout falso e mascara erro real.
           timeout: 60_000,
         }),
       );
@@ -75,6 +74,11 @@ export class EvolutionService {
           this.summarizeResponse(res.data),
         )}`,
       );
+
+      if (params.webhook) {
+        await this.setWebhook(params.instanceName, params.webhook);
+      }
+
       return res.data;
     } catch (e: any) {
       const status = e?.response?.status;
@@ -85,6 +89,32 @@ export class EvolutionService {
         }`,
       );
       throw e;
+    }
+  }
+
+  async setWebhook(instanceName: string, url: string) {
+    try {
+      const res = await firstValueFrom(
+        this.http.post(
+          `${this.baseUrl}/webhook/set/${encodeURIComponent(instanceName)}`,
+          {
+            webhook: {
+              enabled: true,
+              url,
+              webhookByEvents: true,
+              webhookBase64: false,
+              events: ['QRCODE_UPDATED', 'CONNECTION_UPDATE', 'MESSAGES_UPSERT'],
+              headers: { 'x-evo-secret': this.webhookSecret },
+            },
+          },
+          { headers: { ...this.headers(), 'Content-Type': 'application/json' }, timeout: 10_000 },
+        ),
+      );
+      this.logger.debug(`[setWebhook] instance=${instanceName} url=${url}`);
+      return res.data;
+    } catch (e: any) {
+      // Não bloqueia a criação se o webhook falhar — instância já foi criada
+      this.logger.warn(`[setWebhook] instance=${instanceName} failed: ${e?.message}`);
     }
   }
 

@@ -1,7 +1,9 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InstanceStatus, UserRole } from '@prisma/client';
 
 import { JwtPayload } from '../auth/jwt.payload';
+import { Env } from '../config/env';
 import { EvolutionService } from '../evolution/evolution.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -70,10 +72,16 @@ function normalizeQr(raw: any): NormalizedQrResponse {
 @Injectable()
 export class InstancesService {
   private readonly logger = new Logger(InstancesService.name);
+  private readonly webhookUrl: string;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly evolution: EvolutionService,
-  ) {}
+    private readonly config: ConfigService<Env, true>,
+  ) {
+    const apiUrl = this.config.get('API_URL', { infer: true });
+    this.webhookUrl = apiUrl ? `${apiUrl}/webhooks/evolution` : '';
+  }
 
   async listForUser(user: JwtPayload) {
     if (user.role === UserRole.ADMIN) {
@@ -117,6 +125,7 @@ export class InstancesService {
             instanceName: existingByName.instanceName,
             number: input.phoneNumber,
             qrcode: true,
+            webhook: this.webhookUrl || undefined,
           });
           return await this.prisma.whatsAppInstance.update({
             where: { id: existingByName.id },
@@ -140,6 +149,7 @@ export class InstancesService {
         instanceName: input.instanceName,
         number: input.phoneNumber,
         qrcode: true,
+        webhook: this.webhookUrl || undefined,
       });
     } catch (e: any) {
       throw new BadRequestException('Falha ao criar instância na Evolution API');

@@ -1,0 +1,38 @@
+# Service + Endpoints com conexão DIRETA ao pg-sp1 (10.1.0.200).
+#
+# Usado EXCLUSIVAMENTE pelo Job init-evolution-db para criar o banco 'evolution'.
+# CREATE DATABASE não pode passar por PgBouncer (comando DDL fora do fluxo de pool).
+#
+# Conexões de aplicação (backend e evolution-api) usam PgBouncer:
+#   session-bouncer.pgbouncer.svc.cluster.local:6432  (pool_mode=session, Prisma-compatible)
+apiVersion: v1
+kind: Service
+metadata:
+  name: chipfire-postgres
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-postgres
+    app.kubernetes.io/part-of: chipfire
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: chipfire-postgres
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-postgres
+    app.kubernetes.io/part-of: chipfire
+subsets:
+  - addresses:
+      - ip: 10.1.0.200
+    ports:
+      - name: postgres
+        port: 5432

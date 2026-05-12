@@ -1,0 +1,127 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-chipfire-redis
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: azure-file-sc
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - nosharesock
+  claimRef:
+    namespace: pires
+    name: redis-data-chipfire-redis-0
+  csi:
+    driver: file.csi.azure.com
+    volumeHandle: filessmart-chipfire-redis
+    volumeAttributes:
+      shareName: chipfire-redis
+    nodeStageSecretRef:
+      name: azure-filesmake-secret
+      namespace: pires
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-chipfire-evolution-store
+spec:
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: azure-file-sc
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - nosharesock
+  claimRef:
+    namespace: pires
+    name: chipfire-evolution-store
+  csi:
+    driver: file.csi.azure.com
+    volumeHandle: filessmart-chipfire-evolution-store
+    volumeAttributes:
+      shareName: chipfire-evolution-store
+    nodeStageSecretRef:
+      name: azure-filesmake-secret
+      namespace: pires
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-chipfire-evolution-instances
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: azure-file-sc
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - nosharesock
+  claimRef:
+    namespace: pires
+    name: chipfire-evolution-instances
+  csi:
+    driver: file.csi.azure.com
+    volumeHandle: filessmart-chipfire-evolution-instances
+    volumeAttributes:
+      shareName: chipfire-evolution-instances
+    nodeStageSecretRef:
+      name: azure-filesmake-secret
+      namespace: pires
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-chipfire-backend-uploads
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: azure-file-sc
+  mountOptions:
+    - dir_mode=0777
+    - file_mode=0777
+    - uid=0
+    - gid=0
+    - mfsymlinks
+    - cache=strict
+    - nosharesock
+  claimRef:
+    namespace: pires
+    name: chipfire-backend-uploads
+  csi:
+    driver: file.csi.azure.com
+    volumeHandle: filessmart-chipfire-backend-uploads
+    volumeAttributes:
+      shareName: chipfire-backend-uploads
+    nodeStageSecretRef:
+      name: azure-filesmake-secret
+      namespace: pires

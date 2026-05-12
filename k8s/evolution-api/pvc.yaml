@@ -1,0 +1,33 @@
+# Sessões WhatsApp — CRÍTICO: nunca deletar sem backup.
+# Perda destes PVCs = reconexão manual de todas as instâncias.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chipfire-evolution-store
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-evolution
+    app.kubernetes.io/part-of: chipfire
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: azure-file-sc
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chipfire-evolution-instances
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-evolution
+    app.kubernetes.io/part-of: chipfire
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: azure-file-sc
+  resources:
+    requests:
+      storage: 10Gi

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chipfire-evolution
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-evolution
+    app.kubernetes.io/part-of: chipfire
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: chipfire-evolution
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

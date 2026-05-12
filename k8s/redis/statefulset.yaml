@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: chipfire-redis
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-redis
+    app.kubernetes.io/part-of: chipfire
+spec:
+  serviceName: chipfire-redis
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chipfire-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chipfire-redis
+        app.kubernetes.io/part-of: chipfire
+    spec:
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          # Se REDIS_PASSWORD estiver vazio, omite --requirepass (Redis sem auth)
+          command:
+            - /bin/sh
+            - -c
+            - |
+              if [ -n "$REDIS_PASSWORD" ]; then
+                exec redis-server --appendonly yes --requirepass "$REDIS_PASSWORD"
+              else
+                exec redis-server --appendonly yes
+              fi
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: REDIS_PASSWORD
+          ports:
+            - name: redis
+              containerPort: 6379
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+  # StorageClass confirmada no cluster SP: azure-file-sc (Standard_LRS, Retain)
+  volumeClaimTemplates:
+    - metadata:
+        name: redis-data
+        labels:
+          app.kubernetes.io/name: chipfire-redis
+          app.kubernetes.io/part-of: chipfire
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: azure-file-sc
+        resources:
+          requests:
+            storage: 5Gi

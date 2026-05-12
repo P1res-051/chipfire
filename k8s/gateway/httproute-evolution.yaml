@@ -1,0 +1,31 @@
+# Gateway: eg (default namespace) — listener https-automation (*.automation.app.br)
+# Evolution API deve ser acessível externamente para:
+#   - Webhooks do WhatsApp (Meta → POST para esta URL)
+#   - QR Code scan (browser acessa a API diretamente)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: chipfire-evolution
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-evolution
+    app.kubernetes.io/part-of: chipfire
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: eg
+      namespace: default
+      sectionName: https-automation
+  hostnames:
+    - "evolution-api.automation.app.br"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: chipfire-evolution
+          port: 8080
+      timeouts:
+        request: 60s

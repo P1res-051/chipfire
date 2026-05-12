@@ -1,0 +1,52 @@
+# Imagem publicada em: docker.io/alecmoura10/chipfire-frontend
+# Build: DOCKER_BUILDKIT=0, --target prod, Nginx 1.27-alpine
+# Baked: VITE_API_URL=https://chipfire-api.automation.app.br/api
+#        VITE_APP_URL=https://chipfire.automation.app.br
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chipfire-frontend
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-frontend
+    app.kubernetes.io/part-of: chipfire
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chipfire-frontend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chipfire-frontend
+        app.kubernetes.io/part-of: chipfire
+    spec:
+      containers:
+        - name: frontend
+          image: alecmoura10/chipfire-frontend:v1.0.0
+          ports:
+            - name: http
+              containerPort: 80
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "256Mi"

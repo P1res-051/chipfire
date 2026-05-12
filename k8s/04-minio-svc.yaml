@@ -1,0 +1,23 @@
+# Service ExternalName apontando para o MinIO no namespace evolution.
+# Service "minio" no namespace evolution confirmado em:
+#   kubectl get svc -n evolution → minio ClusterIP 10.102.203.185 9000/TCP,9001/TCP
+#
+# Pods no namespace pires acessam via: http://chipfire-minio:9000
+apiVersion: v1
+kind: Service
+metadata:
+  name: chipfire-minio
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-minio
+    app.kubernetes.io/part-of: chipfire
+spec:
+  type: ExternalName
+  externalName: minio.evolution.svc.cluster.local
+  ports:
+    - name: s3
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001

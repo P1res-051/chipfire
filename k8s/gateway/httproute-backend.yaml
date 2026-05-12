@@ -1,0 +1,28 @@
+# Gateway: eg (default namespace) — listener https-automation (*.automation.app.br)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: chipfire-backend
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-backend
+    app.kubernetes.io/part-of: chipfire
+spec:
+  parentRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: eg
+      namespace: default
+      sectionName: https-automation
+  hostnames:
+    - "chipfire-api.automation.app.br"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: chipfire-backend
+          port: 3000
+      timeouts:
+        request: 60s

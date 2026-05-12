@@ -48,7 +48,9 @@ export class WebhooksController {
     }
 
     const instanceName = pickInstanceName(body);
-    const eventType = pickEventType(headers, body);
+    // Normaliza para UPPER_SNAKE independente do formato enviado pela Evolution:
+    // "connection.update" → "CONNECTION_UPDATE", "messages.upsert" → "MESSAGES_UPSERT"
+    const eventType = pickEventType(headers, body).toUpperCase().replace(/\./g, '_');
 
     const instance = instanceName
       ? await this.prisma.whatsAppInstance.findFirst({

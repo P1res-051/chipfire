@@ -1,0 +1,15 @@
+# RWX — Azure Files suporta ReadWriteMany, necessário para HPA com múltiplas réplicas.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: chipfire-backend-uploads
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-backend
+    app.kubernetes.io/part-of: chipfire
+spec:
+  accessModes: ["ReadWriteMany"]
+  storageClassName: azure-file-sc
+  resources:
+    requests:
+      storage: 10Gi

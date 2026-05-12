@@ -1,0 +1,120 @@
+# Imagem publicada em: docker.io/alecmoura10/chipfire-backend
+# Build: DOCKER_BUILDKIT=0, --target prod, Node 22-alpine
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chipfire-backend
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-backend
+    app.kubernetes.io/part-of: chipfire
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: chipfire-backend
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: chipfire-backend
+        app.kubernetes.io/part-of: chipfire
+    spec:
+      initContainers:
+        - name: prisma-migrate
+          image: alecmoura10/chipfire-backend:v1.0.4
+          command: ["npx", "prisma", "migrate", "deploy"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: DATABASE_URL
+
+      containers:
+        - name: backend
+          image: alecmoura10/chipfire-backend:v1.0.4
+          ports:
+            - name: http
+              containerPort: 3000
+
+          # Config não-sensível
+          envFrom:
+            - configMapRef:
+                name: chipfire-config
+
+          # Secrets
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: DATABASE_URL
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: REDIS_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: JWT_SECRET
+            - name: JWT_REFRESH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: JWT_REFRESH_SECRET
+            - name: EVOLUTION_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: EVOLUTION_API_KEY
+            - name: EVOLUTION_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: EVOLUTION_WEBHOOK_SECRET
+            - name: MINIO_ROOT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: chipfire-secrets
+                  key: MINIO_ROOT_PASSWORD
+
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          volumeMounts:
+            - name: uploads
+              mountPath: /app/storage/uploads
+
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: chipfire-backend-uploads

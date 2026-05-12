@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: chipfire-frontend
+  namespace: pires
+  labels:
+    app.kubernetes.io/name: chipfire-frontend
+    app.kubernetes.io/part-of: chipfire
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: chipfire-frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
