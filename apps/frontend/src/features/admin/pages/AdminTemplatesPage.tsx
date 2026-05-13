@@ -1,11 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, Layers, Loader2, Plus, Search, Trash2, Wand2, Pencil } from 'lucide-react'
+import { Copy, FileText, Layers, Loader2, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react'
 import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { ApiStatusPill } from '@/components/ApiStatusPill'
+import { EmptyState } from '@/components/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -406,91 +407,103 @@ export function AdminTemplatesPage() {
         <CardContent>
           {templates.isError ? <div className="text-sm text-destructive">{getErrorMessage(templates.error)}</div> : null}
 
-          <Table className="mt-2 min-w-[980px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[260px]">Nome</TableHead>
-                <TableHead className="w-[200px]">Tags</TableHead>
-                <TableHead>Prévia</TableHead>
-                <TableHead className="w-[180px] text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((t) => (
-                <TableRow key={t.id}>
-                  <TableCell className="font-medium max-w-[260px] truncate" title={t.name}>
-                    {t.name}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {t.tags.length ? (
-                      <div className="flex flex-wrap gap-1">
-                        {t.tags.slice(0, 6).map((tag) => (
-                          <Badge key={tag} className="text-xs" variant="outline" title={tag}>
-                            {tag.length > 16 ? tag.slice(0, 16) + '…' : tag}
-                          </Badge>
-                        ))}
-                        {t.tags.length > 6 ? (
-                          <Badge variant="outline" className="text-xs">{`+${t.tags.length - 6}`}</Badge>
-                        ) : null}
-                      </div>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm truncate" title={t.content}>
-                    {t.content.length > 140 ? t.content.slice(0, 140) + '…' : t.content}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-1 flex-wrap">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(t.content)
-                          toast({ title: 'Conteúdo copiado', variant: 'success' })
-                        }}
-                        title="Copiar"
-                        className="px-2"
-                      >
-                        <Copy />
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => {
-                          setEditing(t)
-                          setOpen(true)
-                        }}
-                        className="px-2"
-                      >
-                        <Pencil /> Editar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => {
-                          const ok = window.confirm('Remover template?')
-                          if (ok) remove.mutate(t.id)
-                        }}
-                        disabled={remove.isPending}
-                        title="Remover"
-                        className="px-2"
-                      >
-                        <Trash2 />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!templates.isPending && filtered.length === 0 ? (
+          {!templates.isPending && filtered.length === 0 ? (
+            <EmptyState
+              icon={<FileText className="h-6 w-6" />}
+              title="Nenhum template encontrado"
+              description="Crie seu primeiro template com variáveis e preview estilo WhatsApp."
+              primaryAction={{
+                label: 'Novo template',
+                onClick: () => {
+                  setEditing(null)
+                  form.reset({ name: '', content: '', tags: '' })
+                  setOpen(true)
+                },
+              }}
+            />
+          ) : (
+            <Table className="mt-2 min-w-[980px]">
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="py-6 text-center text-sm text-muted-foreground">
-                    Nenhum template encontrado.
-                  </TableCell>
+                  <TableHead className="w-[260px]">Nome</TableHead>
+                  <TableHead className="w-[200px]">Tags</TableHead>
+                  <TableHead>Prévia</TableHead>
+                  <TableHead className="w-[220px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
                 </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium max-w-[260px] truncate" title={t.name}>
+                      {t.name}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {t.tags.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {t.tags.slice(0, 6).map((tag) => (
+                            <Badge key={tag} className="text-xs" variant="outline" title={tag}>
+                              {tag.length > 16 ? tag.slice(0, 16) + '…' : tag}
+                            </Badge>
+                          ))}
+                          {t.tags.length > 6 ? (
+                            <Badge variant="outline" className="text-xs">{`+${t.tags.length - 6}`}</Badge>
+                          ) : null}
+                        </div>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm truncate" title={t.content}>
+                      {t.content.length > 140 ? t.content.slice(0, 140) + '…' : t.content}
+                    </TableCell>
+                    <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
+                      <div className="flex justify-end gap-1 flex-wrap">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            await navigator.clipboard.writeText(t.content)
+                            toast({ title: 'Conteúdo copiado', variant: 'success' })
+                          }}
+                          title="Copiar"
+                          className="px-2"
+                        >
+                          <Copy className="h-4 w-4" />
+                          <span className="hidden xl:inline">Copiar</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => {
+                            setEditing(t)
+                            setOpen(true)
+                          }}
+                          className="px-2"
+                        >
+                          <Pencil className="h-4 w-4" />
+                          <span className="hidden xl:inline">Editar</span>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            const ok = window.confirm('Remover template?')
+                            if (ok) remove.mutate(t.id)
+                          }}
+                          disabled={remove.isPending}
+                          title="Remover"
+                          className="px-2"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          <span className="hidden xl:inline">Remover</span>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 

@@ -16,6 +16,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
 import { ApiStatusPill } from '@/components/ApiStatusPill'
+import { EmptyState } from '@/components/EmptyState'
 import { CopyVariableButton } from '@/features/admin/components/CopyVariableButton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -594,6 +595,14 @@ export function AdminContentGroupsPage() {
                 <div key={i} className="h-12 animate-pulse rounded-lg bg-secondary/30" />
               ))}
             </div>
+          ) : filtered.length === 0 ? (
+            <EmptyState
+              icon={<Layers className="h-6 w-6" />}
+              title="Nenhum grupo encontrado"
+              description="Crie seu primeiro grupo para usar como variável em templates e campanhas."
+              primaryAction={{ label: 'Novo Grupo', onClick: openCreateGroup }}
+              secondaryAction={{ label: 'Importar Excel', onClick: () => setImportOpen(true), variant: 'outline' }}
+            />
           ) : (
             <Table className="mt-2 min-w-[1200px]">
               <TableHeader>
@@ -605,7 +614,7 @@ export function AdminContentGroupsPage() {
                   <TableHead className="w-[120px]">Status</TableHead>
                   <TableHead className="w-[70px]">Itens</TableHead>
                   <TableHead className="w-[260px]">Variável</TableHead>
-                  <TableHead className="w-[350px] text-right">Ações</TableHead>
+                  <TableHead className="w-[260px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -631,7 +640,7 @@ export function AdminContentGroupsPage() {
                           <CopyVariableButton variable={variable} />
                         </div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
                         <div className="flex flex-wrap justify-end gap-1">
                           <Button size="sm" variant="secondary" onClick={() => openItems(g)}>
                             <Layers className="h-4 w-4" />
@@ -682,27 +691,6 @@ export function AdminContentGroupsPage() {
                     </TableRow>
                   )
                 })}
-
-                {filtered.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center">
-                      <div className="mx-auto max-w-lg space-y-2">
-                        <div className="text-sm font-semibold">Nenhum grupo encontrado</div>
-                        <div className="text-sm text-muted-foreground">
-                          Ajuste os filtros ou crie um novo grupo para começar.
-                        </div>
-                        <div className="flex justify-center gap-2 pt-2">
-                          <Button onClick={openCreateGroup}>
-                            <Plus /> Novo Grupo
-                          </Button>
-                          <Button variant="outline" onClick={() => setImportOpen(true)}>
-                            <FileSpreadsheet /> Importar Excel
-                          </Button>
-                        </div>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : null}
               </TableBody>
             </Table>
           )}

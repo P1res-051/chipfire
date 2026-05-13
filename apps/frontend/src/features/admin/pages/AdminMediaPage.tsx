@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { FolderOpen, Plus } from 'lucide-react'
 import * as React from 'react'
 
 import { ApiStatusPill } from '@/components/ApiStatusPill'
+import { EmptyState } from '@/components/EmptyState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -132,10 +133,20 @@ export function AdminMediaPage() {
             </div>
           )}
 
-          <MediaList
-            media={mediaQuery.data?.items || []}
-            isLoading={mediaQuery.isPending}
-          />
+          {!mediaQuery.isPending && (mediaQuery.data?.total ?? 0) === 0 ? (
+            <EmptyState
+              icon={<FolderOpen className="h-6 w-6" />}
+              title="Nenhuma mídia cadastrada"
+              description="Comece fazendo upload de um arquivo ou criando um texto reutilizável."
+              primaryAction={{ label: 'Fazer upload', onClick: () => setUploadOpen(true) }}
+              secondaryAction={{ label: 'Novo texto', onClick: () => setTextOpen(true), variant: 'outline' }}
+            />
+          ) : (
+            <MediaList
+              media={mediaQuery.data?.items || []}
+              isLoading={mediaQuery.isPending}
+            />
+          )}
         </CardContent>
       </Card>
 

@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import * as React from 'react'
+import { ListX } from 'lucide-react'
 
 import { ApiStatusPill } from '@/components/ApiStatusPill'
+import { EmptyState } from '@/components/EmptyState'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -215,70 +217,71 @@ export function AdminLogsPage() {
         <CardContent>
           {messageLogs.isError ? <div className="text-sm text-destructive">{getErrorMessage(messageLogs.error)}</div> : null}
 
-          <Table className="mt-2 min-w-[1100px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[170px]">Quando</TableHead>
-                <TableHead className="w-[240px]">Usuário</TableHead>
-                <TableHead className="w-[220px]">Instância</TableHead>
-                <TableHead className="w-[260px]">Contato</TableHead>
-                <TableHead className="w-[110px]">Direção</TableHead>
-                <TableHead className="w-[140px]">Status</TableHead>
-                <TableHead className="w-[160px]">Erro</TableHead>
-                <TableHead className="w-[110px]">Meta</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(messageLogs.data ?? []).map((l) => (
-                <TableRow key={l.id}>
-                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(l.createdAt)}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-[240px] truncate" title={l.user?.email ?? l.userId}>
-                    {l.user?.email ?? l.userId}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[220px] truncate" title={l.instance?.instanceName ?? l.instanceId ?? '—'}>
-                    {l.instance?.instanceName ?? l.instanceId ?? '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[260px] truncate" title={l.contact ? `${l.contact.name} · ${l.contact.phone}` : l.contactId ?? '—'}>
-                    {l.contact ? `${l.contact.name} · ${l.contact.phone}` : l.contactId ?? '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{l.direction}</Badge>
-                  </TableCell>
-                  <TableCell>{statusBadge(l.status)}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {l.errorType || l.errorMessage ? (
-                      <span className="block max-w-[160px] truncate" title={l.errorMessage ?? ''}>
-                        {l.errorType ?? 'ERROR'}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setMetaLog(l)
-                        setMetaOpen(true)
-                      }}
-                      disabled={!l.meta}
-                      title={!l.meta ? 'Sem meta' : 'Ver meta'}
-                    >
-                      Meta
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {!messageLogs.isPending && (messageLogs.data?.length ?? 0) === 0 ? (
+          {!messageLogs.isPending && (messageLogs.data?.length ?? 0) === 0 ? (
+            <EmptyState
+              icon={<ListX className="h-6 w-6" />}
+              title="Nenhum log encontrado"
+              description="Ajuste os filtros (datas, direção, status) para visualizar eventos."
+            />
+          ) : (
+            <Table className="mt-2 min-w-[1100px]">
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
-                    Nenhum log encontrado.
-                  </TableCell>
+                  <TableHead className="w-[170px]">Quando</TableHead>
+                  <TableHead className="w-[240px]">Usuário</TableHead>
+                  <TableHead className="w-[220px]">Instância</TableHead>
+                  <TableHead className="w-[260px]">Contato</TableHead>
+                  <TableHead className="w-[110px]">Direção</TableHead>
+                  <TableHead className="w-[140px]">Status</TableHead>
+                  <TableHead className="w-[160px]">Erro</TableHead>
+                  <TableHead className="w-[110px] sticky right-0 z-20 bg-card border-l">Meta</TableHead>
                 </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {(messageLogs.data ?? []).map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(l.createdAt)}</TableCell>
+                    <TableCell className="text-muted-foreground max-w-[240px] truncate" title={l.user?.email ?? l.userId}>
+                      {l.user?.email ?? l.userId}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-[220px] truncate" title={l.instance?.instanceName ?? l.instanceId ?? '—'}>
+                      {l.instance?.instanceName ?? l.instanceId ?? '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground max-w-[260px] truncate" title={l.contact ? `${l.contact.name} · ${l.contact.phone}` : l.contactId ?? '—'}>
+                      {l.contact ? `${l.contact.name} · ${l.contact.phone}` : l.contactId ?? '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">{l.direction}</Badge>
+                    </TableCell>
+                    <TableCell>{statusBadge(l.status)}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {l.errorType || l.errorMessage ? (
+                        <span className="block max-w-[160px] truncate" title={l.errorMessage ?? ''}>
+                          {l.errorType ?? 'ERROR'}
+                        </span>
+                      ) : (
+                        '—'
+                      )}
+                    </TableCell>
+                    <TableCell className="sticky right-0 z-10 bg-card border-l">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setMetaLog(l)
+                          setMetaOpen(true)
+                        }}
+                        disabled={!l.meta}
+                        title={!l.meta ? 'Sem meta' : 'Ver meta'}
+                      >
+                        Meta
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -302,41 +305,42 @@ export function AdminLogsPage() {
         <CardContent>
           {auditLogs.isError ? <div className="text-sm text-destructive">{getErrorMessage(auditLogs.error)}</div> : null}
 
-          <Table className="mt-2 min-w-[900px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[170px]">Quando</TableHead>
-                <TableHead className="w-[260px]">Usuário</TableHead>
-                <TableHead className="w-[220px]">Ação</TableHead>
-                <TableHead>Entidade</TableHead>
-                <TableHead className="w-[160px]">IP</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(auditLogs.data ?? []).map((a) => (
-                <TableRow key={a.id}>
-                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(a.createdAt)}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-[260px] truncate" title={a.user?.email ?? a.userId ?? '—'}>
-                    {a.user?.email ?? a.userId ?? '—'}
-                  </TableCell>
-                  <TableCell className="font-medium max-w-[220px] truncate" title={a.action}>
-                    {a.action}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground truncate" title={a.entity ? `${a.entity}${a.entityId ? `#${a.entityId}` : ''}` : '—'}>
-                    {a.entity ? `${a.entity}${a.entityId ? `#${a.entityId}` : ''}` : '—'}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">{a.ipAddress ?? '—'}</TableCell>
-                </TableRow>
-              ))}
-              {!auditLogs.isPending && (auditLogs.data?.length ?? 0) === 0 ? (
+          {!auditLogs.isPending && (auditLogs.data?.length ?? 0) === 0 ? (
+            <EmptyState
+              icon={<ListX className="h-6 w-6" />}
+              title="Nenhum audit log encontrado"
+              description="Ajuste o filtro de ação (ex.: ADMIN_USER_CREATE) ou o intervalo de datas."
+            />
+          ) : (
+            <Table className="mt-2 min-w-[900px]">
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="py-6 text-center text-sm text-muted-foreground">
-                    Nenhum audit log encontrado.
-                  </TableCell>
+                  <TableHead className="w-[170px]">Quando</TableHead>
+                  <TableHead className="w-[260px]">Usuário</TableHead>
+                  <TableHead className="w-[220px]">Ação</TableHead>
+                  <TableHead>Entidade</TableHead>
+                  <TableHead className="w-[160px]">IP</TableHead>
                 </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {(auditLogs.data ?? []).map((a) => (
+                  <TableRow key={a.id}>
+                    <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(a.createdAt)}</TableCell>
+                    <TableCell className="text-muted-foreground max-w-[260px] truncate" title={a.user?.email ?? a.userId ?? '—'}>
+                      {a.user?.email ?? a.userId ?? '—'}
+                    </TableCell>
+                    <TableCell className="font-medium max-w-[220px] truncate" title={a.action}>
+                      {a.action}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground truncate" title={a.entity ? `${a.entity}${a.entityId ? `#${a.entityId}` : ''}` : '—'}>
+                      {a.entity ? `${a.entity}${a.entityId ? `#${a.entityId}` : ''}` : '—'}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground whitespace-nowrap">{a.ipAddress ?? '—'}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       </Card>
     </div>

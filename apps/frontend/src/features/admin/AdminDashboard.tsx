@@ -1,7 +1,8 @@
-import { Activity, Boxes, MessageSquareText, Users } from 'lucide-react'
+import { Activity, Boxes, Info, MessageSquareText, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 
 import { ApiStatusPill } from '@/components/ApiStatusPill'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/http'
@@ -28,6 +29,33 @@ export function AdminDashboard() {
     },
     staleTime: 15_000,
   })
+
+  const health = (() => {
+    if (dashboard.isPending) return { display: '…', label: '', variant: 'outline' as const, title: '' }
+    const d = dashboard.data
+    if (!d) return { display: 'N/A', label: 'Métrica em consolidação', variant: 'outline' as const, title: tooltipText }
+
+    const hasSignal = (d.connectedInstances ?? 0) > 0 || (d.messagesSentToday ?? 0) > 0 || (d.messagesReceivedToday ?? 0) > 0
+    const raw = d.healthAverage
+
+    // Se o backend ainda não consolidou a métrica (0%), não mostrar como erro visual.
+    if (!raw || raw <= 0) {
+      if (!hasSignal) return { display: 'N/A', label: 'Métrica em consolidação', variant: 'outline' as const, title: tooltipText }
+
+      // Estimativa simples (somente UI) baseada em sinais já existentes no dashboard.
+      let score = 0
+      if ((d.connectedInstances ?? 0) > 0) score += 40
+      if ((d.messagesSentToday ?? 0) > 0 && (d.errorsToday ?? 0) === 0) score += 20
+      if ((d.messagesReceivedToday ?? 0) > 0) score += 20
+      if ((d.errorsToday ?? 0) === 0) score += 10
+      if ((d.optOutContacts ?? 0) === 0) score += 10
+
+      return { display: `${score}%`, label: `${classify(score)} (estimado)`, variant: badgeVariant(score), title: tooltipText }
+    }
+
+    const score = Math.max(0, Math.min(100, Math.round(raw)))
+    return { display: `${score}%`, label: classify(score), variant: badgeVariant(score), title: tooltipText }
+  })()
 
   return (
     <div className="space-y-6">
@@ -109,13 +137,34 @@ export function AdminDashboard() {
             <Activity className="text-neon-blue" />
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-semibold">
-              {dashboard.isPending ? '…' : `${dashboard.data?.healthAverage ?? 0}%`}
+            <div className="flex items-center gap-2">
+              <div className="text-3xl font-semibold">{health.display}</div>
+              <Badge variant={health.variant} className="mt-1" title={health.title}>
+                {health.label}
+                <Info className="h-3.5 w-3.5 opacity-70" />
+              </Badge>
             </div>
-            <p className="text-xs text-muted-foreground">Média de Saúde Operacional (0–100)</p>
+            <p className="text-xs text-muted-foreground">Saúde Operacional (0–100)</p>
           </CardContent>
         </Card>
       </div>
     </div>
   )
+}
+
+const tooltipText =
+  'A saúde operacional considera conexão, erros, atividade e respostas. Será calculada após dados suficientes.'
+
+function classify(score: number) {
+  if (score < 40) return 'Crítica'
+  if (score < 60) return 'Atenção'
+  if (score < 80) return 'Boa'
+  return 'Excelente'
+}
+
+function badgeVariant(score: number): React.ComponentProps<typeof Badge>['variant'] {
+  if (score < 40) return 'destructive'
+  if (score < 60) return 'warning'
+  if (score < 80) return 'default'
+  return 'success'
 }

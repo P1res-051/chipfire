@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus } from 'lucide-react'
+import { Megaphone, Plus } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/EmptyState'
 import { api } from '@/lib/api'
 import { CampaignList } from '../components/campaigns/CampaignList'
 import { CampaignDetail } from '../components/campaigns/CampaignDetail'
@@ -89,11 +90,12 @@ export function AdminCampaignsPage() {
               </CardContent>
             </Card>
           ) : filteredCampaigns.length === 0 ? (
-            <Card>
-              <CardContent className="p-4 text-sm text-muted-foreground text-center">
-                Nenhuma campanha encontrada
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={<Megaphone className="h-6 w-6" />}
+              title="Nenhuma campanha encontrada"
+              description="Crie sua primeira campanha e valide a simulação antes de executar."
+              primaryAction={{ label: 'Nova Campanha', onClick: () => setIsCreateDialogOpen(true) }}
+            />
           ) : (
             <CampaignList
               campaigns={filteredCampaigns}
@@ -112,13 +114,13 @@ export function AdminCampaignsPage() {
               onCampaignUpdate={() => campaignsQuery.refetch()}
             />
           ) : (
-            <Card>
-              <CardContent className="p-12 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Selecione uma campanha para visualizar detalhes
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              icon={<Megaphone className="h-6 w-6" />}
+              title="Selecione uma campanha"
+              description="Escolha uma campanha na lista ao lado para ver detalhes, simulação e status."
+              primaryAction={{ label: 'Nova Campanha', onClick: () => setIsCreateDialogOpen(true) }}
+              secondaryAction={{ label: 'Limpar busca', onClick: () => setSearchTerm(''), variant: 'outline' }}
+            />
           )}
         </div>
       </div>

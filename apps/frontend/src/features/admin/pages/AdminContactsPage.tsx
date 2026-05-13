@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, FileUp, Plus, ShieldOff } from 'lucide-react'
+import { Download, FileUp, Pencil, Plus, ShieldOff } from 'lucide-react'
 import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -296,7 +296,7 @@ export function AdminContactsPage() {
                 <TableHead className="w-[90px]">Opt-in</TableHead>
                 <TableHead className="w-[120px]">Status</TableHead>
                 <TableHead className="w-[160px]">Atualizado</TableHead>
-                <TableHead className="w-[160px] text-right">Ações</TableHead>
+                <TableHead className="w-[200px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -316,7 +316,7 @@ export function AdminContactsPage() {
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{statusBadge(c.status)}</TableCell>
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(c.updatedAt)}</TableCell>
-                  <TableCell className="text-right whitespace-nowrap">
+                  <TableCell className="text-right whitespace-nowrap sticky right-0 z-10 bg-card border-l">
                     <div className="flex justify-end gap-1 flex-wrap">
                       <Button
                         size="sm"
@@ -340,7 +340,8 @@ export function AdminContactsPage() {
                         }}
                         className="px-2"
                       >
-                        Editar
+                        <Pencil className="h-4 w-4" />
+                        <span className="hidden xl:inline">Editar</span>
                       </Button>
                     </div>
                   </TableCell>

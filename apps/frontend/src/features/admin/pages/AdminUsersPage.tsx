@@ -255,33 +255,37 @@ export function AdminUsersPage() {
             </div>
           ) : null}
 
-          <Table className="mt-2">
+          <Table className="mt-2 min-w-[1100px]">
             <TableHeader>
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Limite</TableHead>
-                <TableHead>Instâncias</TableHead>
-                <TableHead>Último login</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead className="w-[220px]">Nome</TableHead>
+                <TableHead className="w-[260px]">E-mail</TableHead>
+                <TableHead className="w-[110px]">Role</TableHead>
+                <TableHead className="w-[120px]">Status</TableHead>
+                <TableHead className="w-[80px]">Limite</TableHead>
+                <TableHead className="w-[90px]">Instâncias</TableHead>
+                <TableHead className="w-[170px]">Último login</TableHead>
+                <TableHead className="w-[240px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((u) => (
                 <TableRow key={u.id}>
-                  <TableCell className="font-medium">{u.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                  <TableCell className="font-medium max-w-[220px] truncate" title={u.name}>
+                    {u.name}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground max-w-[260px] truncate" title={u.email}>
+                    {u.email}
+                  </TableCell>
                   <TableCell>{roleBadge(u.role)}</TableCell>
                   <TableCell>{statusBadge(u.status)}</TableCell>
                   <TableCell>{u.instanceLimit}</TableCell>
                   <TableCell>{u._count?.instances ?? 0}</TableCell>
-                  <TableCell className="text-muted-foreground">
+                  <TableCell className="text-muted-foreground text-xs whitespace-nowrap">
                     {formatDateTime(u.lastLoginAt)}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                  <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
+                    <div className="flex justify-end gap-1 flex-wrap">
                       <Button
                         variant="outline"
                         size="sm"
@@ -297,8 +301,10 @@ export function AdminUsersPage() {
                         }}
                         disabled={updateStatus.isPending}
                         title={u.status === 'ACTIVE' ? 'Desativar' : 'Ativar'}
+                        className="px-2"
                       >
-                        <Power />
+                        <Power className="h-4 w-4" />
+                        <span className="hidden xl:inline">{u.status === 'ACTIVE' ? 'Desativar' : 'Ativar'}</span>
                       </Button>
                       <Button
                         variant="secondary"
@@ -307,8 +313,10 @@ export function AdminUsersPage() {
                           setSelected(u)
                           setEditOpen(true)
                         }}
+                        className="px-2"
                       >
-                        <Pencil /> Editar
+                        <Pencil className="h-4 w-4" />
+                        <span className="hidden xl:inline">Editar</span>
                       </Button>
                       <Button
                         variant="outline"
@@ -318,8 +326,10 @@ export function AdminUsersPage() {
                           resetForm.reset({ newPassword: '' })
                           setResetOpen(true)
                         }}
+                        className="px-2"
                       >
-                        <RefreshCcw /> Reset senha
+                        <RefreshCcw className="h-4 w-4" />
+                        <span className="hidden xl:inline">Reset senha</span>
                       </Button>
                     </div>
                   </TableCell>

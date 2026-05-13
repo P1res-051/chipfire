@@ -133,7 +133,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
               <TableHead className="w-[220px]">Tags</TableHead>
               <TableHead className="w-[110px]">Tamanho</TableHead>
               <TableHead className="w-[240px]">Variável</TableHead>
-              <TableHead className="w-[160px] text-right">Ações</TableHead>
+              <TableHead className="w-[160px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -178,7 +178,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                     <CopyVariableButton variable={m.variable} />
                   </div>
                 </TableCell>
-                <TableCell className="text-right whitespace-nowrap">
+                <TableCell className="text-right whitespace-nowrap sticky right-0 z-10 bg-card border-l">
                   <div className="flex justify-end gap-1 flex-wrap">
                     {m.publicUrl && m.type !== 'TEXT' && (
                       <Button

@@ -52,7 +52,7 @@ export function LoginPage() {
               <img
                 src={chipfireIcon}
                 alt="ChipFire"
-                className="h-20 w-20 object-contain drop-shadow-[0_0_14px_rgba(255,109,0,0.22)]"
+                className="h-16 w-16 object-contain drop-shadow-[0_0_14px_rgba(255,109,0,0.22)]"
               />
               <CardTitle className="text-2xl text-center">ChipFire</CardTitle>
               <CardDescription className="text-center">

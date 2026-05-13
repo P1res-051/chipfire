@@ -56,9 +56,9 @@ export function AppShell(props: { variant: 'admin' | 'user'; children: React.Rea
           <div className="rounded-xl border bg-card shadow-glow p-4">
             <Link
               to={props.variant === 'admin' ? '/admin/dashboard' : '/user/dashboard'}
-              className="flex items-center gap-2"
+              className="flex items-center gap-3"
             >
-              <img src={chipfireIcon} alt="ChipFire" className="h-9 w-9 object-contain" />
+              <img src={chipfireIcon} alt="ChipFire" className="h-7 w-7 shrink-0 object-contain" />
               <span className="font-semibold text-primary">ChipFire</span>
               {props.variant === 'admin' ? (
                 <Shield className="ml-auto h-4 w-4 text-primary/80" />
@@ -66,7 +66,7 @@ export function AppShell(props: { variant: 'admin' | 'user'; children: React.Rea
                 <User className="ml-auto h-4 w-4 text-accent/80" />
               )}
             </Link>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
               Operação inteligente · Segurança · Automação
             </p>
           </div>

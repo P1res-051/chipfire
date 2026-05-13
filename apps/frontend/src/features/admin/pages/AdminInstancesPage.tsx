@@ -17,6 +17,7 @@ import { useToast } from '@/components/ui/toast'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { getErrorMessage } from '@/lib/http'
+import { cn } from '@/lib/utils'
 
 type InstanceStatus = 'WAITING_QR' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'PAUSED'
 
@@ -233,6 +234,41 @@ export function AdminInstancesPage() {
       toast({ title: 'Falha ao remover', description: getErrorMessage(e), variant: 'destructive' }),
   })
 
+  function getHealthInfo(i: Instance) {
+    const tooltip =
+      'A saúde operacional considera conexão, erros, atividade e respostas. Será calculada após dados suficientes.'
+
+    // Se o backend já manda uma pontuação válida, usamos.
+    if (typeof i.healthScore === 'number' && i.healthScore > 0) {
+      const score = clampScore(i.healthScore)
+      return { display: `${score}%`, label: classify(score), variant: badgeVariant(score), title: tooltip }
+    }
+
+    // Estimativa simples (somente UI) baseada em sinais disponíveis na listagem.
+    const hasSignal =
+      i.status === 'CONNECTED' ||
+      (i.messagesSentToday ?? 0) > 0 ||
+      (i.messagesReceivedToday ?? 0) > 0 ||
+      Boolean(i.lastActivityAt)
+
+    if (!hasSignal) return { display: 'N/A', label: 'Métrica em consolidação', variant: 'outline' as const, title: tooltip }
+
+    let score = 0
+    if (i.status === 'CONNECTED') score += 40
+    if ((i.messagesSentToday ?? 0) > 0) score += 20
+    if ((i.messagesReceivedToday ?? 0) > 0) score += 20
+    if (i.status !== 'ERROR' && i.status !== 'DISCONNECTED') score += 10
+
+    // bônus de atividade recente (últimas 24h)
+    if (i.lastActivityAt) {
+      const last = new Date(i.lastActivityAt).getTime()
+      if (!Number.isNaN(last) && Date.now() - last < 24 * 60 * 60 * 1000) score += 10
+    }
+
+    const finalScore = clampScore(score)
+    return { display: `${finalScore}%`, label: `${classify(finalScore)} (estimado)`, variant: badgeVariant(finalScore), title: tooltip }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -309,7 +345,7 @@ export function AdminInstancesPage() {
                 <TableHead className="w-[110px]">Msgs hoje</TableHead>
                 <TableHead className="w-[160px]">Saúde</TableHead>
                 <TableHead className="w-[170px]">Última atividade</TableHead>
-                <TableHead className="w-[320px] text-right">Ações</TableHead>
+                <TableHead className={cn('w-[240px] text-right sticky right-0 z-20 bg-card border-l')}>Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -322,13 +358,27 @@ export function AdminInstancesPage() {
                     {i.user ? `${i.user.name} · ${i.user.email}` : i.userId}
                   </TableCell>
                   <TableCell>{statusBadge(i.status)}</TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">{i.phoneNumber ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground whitespace-nowrap" title={i.phoneNumber ?? ''}>
+                    {i.phoneNumber ?? '—'}
+                  </TableCell>
                   <TableCell>{(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-[160px] truncate" title={`${i.healthScore ?? 0}% · ${i.healthLabel}`}>
-                    {i.healthScore ?? 0}% · {i.healthLabel}
+                  <TableCell className="text-muted-foreground max-w-[160px] truncate" title={getHealthInfo(i).title}>
+                    {(() => {
+                      const h = getHealthInfo(i)
+                      return (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Badge variant={h.variant} className="whitespace-nowrap">
+                            {h.display}
+                          </Badge>
+                          <span className="text-xs text-muted-foreground truncate" title={h.label}>
+                            {h.label}
+                          </span>
+                        </div>
+                      )
+                    })()}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(i.lastActivityAt)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className={cn('text-right sticky right-0 z-10 bg-card border-l')}>
                     <div className="flex flex-wrap justify-end gap-1">
                       <Button
                         size="sm"
@@ -490,4 +540,23 @@ export function AdminInstancesPage() {
       </Dialog>
     </div>
   )
+}
+
+function clampScore(v: number) {
+  const n = Math.round(Number(v) || 0)
+  return Math.max(0, Math.min(100, n))
+}
+
+function classify(score: number) {
+  if (score < 40) return 'Crítica'
+  if (score < 60) return 'Atenção'
+  if (score < 80) return 'Boa'
+  return 'Excelente'
+}
+
+function badgeVariant(score: number): React.ComponentProps<typeof Badge>['variant'] {
+  if (score < 40) return 'destructive'
+  if (score < 60) return 'warning'
+  if (score < 80) return 'default'
+  return 'success'
 }
