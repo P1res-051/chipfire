@@ -134,6 +134,9 @@ model WhatsAppInstance {
   instanceName          String
   phoneNumber           String?
   status                InstanceStatus @default(WAITING_QR)
+  maturationEnabled     Boolean        @default(false)
+  maturationLastSentAt  DateTime?
+  maturationLastQueueAt DateTime?
   qrCode                String?
   provider              String         @default("EVOLUTION")
   connectedAt           DateTime?

@@ -9,6 +9,8 @@ import { RolesGuard } from '../auth/roles.guard';
 import { AuditService } from '../audit/audit.service';
 import { CreateInstanceDto } from './dto/create-instance.dto';
 import { AdminCreateInstanceDto } from './dto/admin-create-instance.dto';
+import { UpdateInstanceMaturationDto } from './dto/update-instance-maturation.dto'
+import { InstanceMaturationService } from './instance-maturation.service'
 import { InstancesService } from './instances.service';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -16,6 +18,7 @@ import { InstancesService } from './instances.service';
 export class InstancesController {
   constructor(
     private readonly instances: InstancesService,
+    private readonly maturation: InstanceMaturationService,
     private readonly audit: AuditService,
   ) {}
 
@@ -90,6 +93,15 @@ export class InstancesController {
   @Put(':id/disconnect')
   disconnect(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.instances.disconnect(user, id);
+  }
+
+  @Put(':id/maturation')
+  updateMaturation(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: UpdateInstanceMaturationDto,
+  ) {
+    return this.maturation.updateEnabled(user, id, dto.enabled)
   }
 
   @Delete(':id')

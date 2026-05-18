@@ -24,6 +24,8 @@ type Instance = {
   instanceName: string
   phoneNumber: string | null
   status: InstanceStatus
+  maturationEnabled: boolean
+  maturationLastSentAt: string | null
   qrCode: string | null
   messagesSentToday: number
   messagesReceivedToday: number
@@ -135,7 +137,7 @@ export function UserInstancesPage() {
       }
     }
 
-    build()
+    void build()
     return () => {
       cancelled = true
     }
@@ -155,13 +157,17 @@ export function UserInstancesPage() {
       return data as Instance
     },
     onSuccess: async () => {
-      toast({ title: 'Instância criada', variant: 'success' })
+      toast({ title: 'Instancia criada', variant: 'success' })
       setCreateOpen(false)
       createForm.reset()
       await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
     },
     onError: (e) =>
-      toast({ title: 'Falha ao criar instância', description: getErrorMessage(e), variant: 'destructive' }),
+      toast({
+        title: 'Falha ao criar instancia',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
   })
 
   const fetchQr = useMutation({
@@ -170,13 +176,17 @@ export function UserInstancesPage() {
       return data as { success: boolean; qrcode?: string; code?: string; message?: string }
     },
     onSuccess: (data, instance) => {
-      setQrError(!data.success ? data.message ?? 'QR Code não disponível' : null)
+      setQrError(!data.success ? data.message ?? 'QR Code nao disponivel' : null)
       setQrValue(data.qrcode ?? data.code ?? null)
       setQrInstanceId(instance.id)
       setQrOpen(true)
     },
     onError: (e) =>
-      toast({ title: 'Falha ao obter QR Code', description: getErrorMessage(e), variant: 'destructive' }),
+      toast({
+        title: 'Falha ao obter QR Code',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
   })
 
   const fetchStatus = useMutation({
@@ -187,31 +197,45 @@ export function UserInstancesPage() {
     onSuccess: (data) =>
       toast({ title: 'Status do provedor', description: data.providerState, variant: 'success' }),
     onError: (e) =>
-      toast({ title: 'Falha ao consultar status', description: getErrorMessage(e), variant: 'destructive' }),
+      toast({
+        title: 'Falha ao consultar status',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
   })
 
   const reconnect = useMutation({
     mutationFn: async (instance: Instance) => {
       const { data } = await api.put(`/instances/${instance.id}/reconnect`)
-      return data as any
+      return data as unknown
     },
     onSuccess: async () => {
-      toast({ title: 'Reconectando…', variant: 'success' })
+      toast({ title: 'Reconectando...', variant: 'success' })
       await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
     },
-    onError: (e) => toast({ title: 'Falha ao reconectar', description: getErrorMessage(e), variant: 'destructive' }),
+    onError: (e) =>
+      toast({
+        title: 'Falha ao reconectar',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
   })
 
   const disconnect = useMutation({
     mutationFn: async (instance: Instance) => {
       const { data } = await api.put(`/instances/${instance.id}/disconnect`)
-      return data as any
+      return data as unknown
     },
     onSuccess: async () => {
-      toast({ title: 'Instância desconectada', variant: 'success' })
+      toast({ title: 'Instancia desconectada', variant: 'success' })
       await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
     },
-    onError: (e) => toast({ title: 'Falha ao desconectar', description: getErrorMessage(e), variant: 'destructive' }),
+    onError: (e) =>
+      toast({
+        title: 'Falha ao desconectar',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
   })
 
   const remove = useMutation({
@@ -220,10 +244,40 @@ export function UserInstancesPage() {
       return data as { ok: boolean }
     },
     onSuccess: async () => {
-      toast({ title: 'Instância removida', variant: 'success' })
+      toast({ title: 'Instancia removida', variant: 'success' })
       await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
     },
-    onError: (e) => toast({ title: 'Falha ao remover', description: getErrorMessage(e), variant: 'destructive' }),
+    onError: (e) =>
+      toast({
+        title: 'Falha ao remover',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
+  })
+
+  const toggleMaturation = useMutation({
+    mutationFn: async (payload: { instance: Instance; enabled: boolean }) => {
+      const { data } = await api.put(`/instances/${payload.instance.id}/maturation`, {
+        enabled: payload.enabled,
+      })
+      return data as Instance
+    },
+    onSuccess: async (_, payload) => {
+      toast({
+        title: payload.enabled ? 'Maturacao ligada' : 'Maturacao pausada',
+        description: payload.enabled
+          ? 'A instancia entrou na fila automatica de aquecimento.'
+          : 'A instancia saiu da fila automatica.',
+        variant: 'success',
+      })
+      await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    },
+    onError: (e) =>
+      toast({
+        title: 'Falha ao atualizar maturacao',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
   })
 
   React.useEffect(() => {
@@ -244,7 +298,7 @@ export function UserInstancesPage() {
 
     closeQr()
     toast({
-      title: 'Instância conectada',
+      title: 'Instancia conectada',
       description: current.phoneNumber ? `Telefone ${current.phoneNumber}` : undefined,
       variant: 'success',
     })
@@ -255,15 +309,15 @@ export function UserInstancesPage() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold">Minhas instâncias</h1>
+            <h1 className="text-2xl font-semibold">Minhas instancias</h1>
             <ApiStatusPill />
           </div>
           <p className="text-sm text-muted-foreground">
-            Crie instâncias, pegue o QR Code e gerencie conexão.
+            Crie instancias, pegue o QR Code e gerencie conexao e maturacao.
           </p>
         </div>
         <Button onClick={() => setCreateOpen(true)}>
-          <Plus /> Nova instância
+          <Plus /> Nova instancia
         </Button>
       </div>
 
@@ -272,31 +326,41 @@ export function UserInstancesPage() {
           <CardHeader className="py-3">
             <CardTitle className="text-sm">Total</CardTitle>
           </CardHeader>
-          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.total}</CardContent>
+          <CardContent className="pb-4 text-2xl font-semibold">
+            {instances.isPending ? '-' : metrics.total}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="py-3">
             <CardTitle className="text-sm">Conectadas</CardTitle>
           </CardHeader>
-          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.connected}</CardContent>
+          <CardContent className="pb-4 text-2xl font-semibold">
+            {instances.isPending ? '-' : metrics.connected}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="py-3">
             <CardTitle className="text-sm">Aguardando QR</CardTitle>
           </CardHeader>
-          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.waitingQr}</CardContent>
+          <CardContent className="pb-4 text-2xl font-semibold">
+            {instances.isPending ? '-' : metrics.waitingQr}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="py-3">
             <CardTitle className="text-sm">Desconectadas</CardTitle>
           </CardHeader>
-          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : metrics.disconnected}</CardContent>
+          <CardContent className="pb-4 text-2xl font-semibold">
+            {instances.isPending ? '-' : metrics.disconnected}
+          </CardContent>
         </Card>
         <Card>
           <CardHeader className="py-3">
-            <CardTitle className="text-sm">Saúde média</CardTitle>
+            <CardTitle className="text-sm">Saude media</CardTitle>
           </CardHeader>
-          <CardContent className="pb-4 text-2xl font-semibold">{instances.isPending ? '—' : `${metrics.healthAvg}%`}</CardContent>
+          <CardContent className="pb-4 text-2xl font-semibold">
+            {instances.isPending ? '-' : `${metrics.healthAvg}%`}
+          </CardContent>
         </Card>
       </div>
 
@@ -304,7 +368,7 @@ export function UserInstancesPage() {
         <CardHeader className="flex-row items-center justify-between space-y-0">
           <CardTitle>Lista</CardTitle>
           <div className="text-sm text-muted-foreground">
-            {instances.isPending ? 'Carregando…' : `${instances.data?.length ?? 0} registros`}
+            {instances.isPending ? 'Carregando...' : `${instances.data?.length ?? 0} registros`}
           </div>
         </CardHeader>
         <CardContent>
@@ -315,13 +379,14 @@ export function UserInstancesPage() {
           <Table className="mt-2">
             <TableHeader>
               <TableRow>
-                <TableHead>Instância</TableHead>
+                <TableHead>Instancia</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Msgs hoje</TableHead>
-                <TableHead>Saúde</TableHead>
-                <TableHead>Última atividade</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
+                <TableHead>Saude</TableHead>
+                <TableHead>Maturacao</TableHead>
+                <TableHead>Ultima atividade</TableHead>
+                <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -329,14 +394,40 @@ export function UserInstancesPage() {
                 <TableRow key={i.id}>
                   <TableCell className="font-medium">{i.instanceName}</TableCell>
                   <TableCell>{statusBadge(i.status)}</TableCell>
-                  <TableCell className="text-muted-foreground">{i.phoneNumber ?? '—'}</TableCell>
+                  <TableCell className="text-muted-foreground">{i.phoneNumber ?? '-'}</TableCell>
                   <TableCell>{(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}</TableCell>
                   <TableCell className="text-muted-foreground">
                     {i.healthScore ?? 0}% · {i.healthLabel}
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{formatDateTime(i.lastActivityAt)}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {i.maturationEnabled ? (
+                      <div className="space-y-1">
+                        <Badge variant="success">Na fila</Badge>
+                        <div className="text-xs text-muted-foreground">
+                          {i.maturationLastSentAt
+                            ? `Ultimo envio ${formatDateTime(i.maturationLastSentAt)}`
+                            : 'Aguardando disparo'}
+                        </div>
+                      </div>
+                    ) : (
+                      <Badge variant="outline">OFF</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {formatDateTime(i.lastActivityAt)}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant={i.maturationEnabled ? 'secondary' : 'outline'}
+                        onClick={() =>
+                          toggleMaturation.mutate({ instance: i, enabled: !i.maturationEnabled })
+                        }
+                        disabled={toggleMaturation.isPending}
+                      >
+                        {i.maturationEnabled ? 'Pausar maturacao' : 'Ligar maturacao'}
+                      </Button>
                       <Button
                         size="sm"
                         variant="secondary"
@@ -348,14 +439,19 @@ export function UserInstancesPage() {
                       >
                         <QrCode /> QR
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => fetchStatus.mutate(i)} disabled={fetchStatus.isPending}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => fetchStatus.mutate(i)}
+                        disabled={fetchStatus.isPending}
+                      >
                         <RefreshCcw /> Status
                       </Button>
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const ok = window.confirm(`Desconectar a instância "${i.instanceName}"?`)
+                          const ok = window.confirm(`Desconectar a instancia "${i.instanceName}"?`)
                           if (!ok) return
                           disconnect.mutate(i)
                         }}
@@ -367,7 +463,7 @@ export function UserInstancesPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const ok = window.confirm(`Reconectar a instância "${i.instanceName}"?`)
+                          const ok = window.confirm(`Reconectar a instancia "${i.instanceName}"?`)
                           if (!ok) return
                           reconnect.mutate(i)
                         }}
@@ -379,7 +475,7 @@ export function UserInstancesPage() {
                         size="sm"
                         variant="destructive"
                         onClick={() => {
-                          const ok = window.confirm(`Remover instância "${i.instanceName}"?`)
+                          const ok = window.confirm(`Remover instancia "${i.instanceName}"?`)
                           if (ok) remove.mutate(i)
                         }}
                         disabled={remove.isPending}
@@ -392,8 +488,8 @@ export function UserInstancesPage() {
               ))}
               {!instances.isPending && (instances.data?.length ?? 0) === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-6 text-center text-sm text-muted-foreground">
-                    Nenhuma instância encontrada.
+                  <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
+                    Nenhuma instancia encontrada.
                   </TableCell>
                 </TableRow>
               ) : null}
@@ -403,14 +499,22 @@ export function UserInstancesPage() {
       </Card>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent title="Nova instância" description="Cria a instância na Evolution API para seu usuário.">
-          <form className="space-y-4" onSubmit={createForm.handleSubmit((v) => createInstance.mutate(v))}>
+        <DialogContent
+          title="Nova instancia"
+          description="Cria a instancia na Evolution API para seu usuario."
+        >
+          <form
+            className="space-y-4"
+            onSubmit={createForm.handleSubmit((v) => createInstance.mutate(v))}
+          >
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
-                <label className="text-sm text-muted-foreground">Nome da instância</label>
+                <label className="text-sm text-muted-foreground">Nome da instancia</label>
                 <Input {...createForm.register('instanceName')} />
                 {createForm.formState.errors.instanceName?.message ? (
-                  <p className="text-sm text-red-400">{createForm.formState.errors.instanceName.message}</p>
+                  <p className="text-sm text-red-400">
+                    {createForm.formState.errors.instanceName.message}
+                  </p>
                 ) : null}
               </div>
               <div className="space-y-1">
@@ -423,7 +527,7 @@ export function UserInstancesPage() {
                 Cancelar
               </Button>
               <Button type="submit" disabled={createInstance.isPending}>
-                {createInstance.isPending ? 'Criando…' : 'Criar'}
+                {createInstance.isPending ? 'Criando...' : 'Criar'}
               </Button>
             </div>
           </form>
@@ -448,7 +552,7 @@ export function UserInstancesPage() {
                 />
               ) : (
                 <div className="rounded-lg border bg-secondary/30 p-3 text-sm">
-                  Código recebido (não foi possível renderizar imagem):
+                  Codigo recebido (nao foi possivel renderizar imagem):
                   <pre className="mt-2 overflow-auto text-xs">{qrValue}</pre>
                 </div>
               )}

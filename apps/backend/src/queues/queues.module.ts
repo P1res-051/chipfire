@@ -29,6 +29,7 @@ import { Env } from '../config/env';
       { name: 'report-export-queue' },
       { name: 'health-score-queue' },
       { name: 'campaign-execution-queue' },
+      { name: 'instance-maturation-queue' },
     ),
   ],
 })
