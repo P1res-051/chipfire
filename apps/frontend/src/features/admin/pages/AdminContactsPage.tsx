@@ -287,16 +287,25 @@ export function AdminContactsPage() {
             <div className="text-sm text-destructive">{getErrorMessage(contacts.error)}</div>
           ) : null}
 
-          <Table className="mt-2 min-w-[980px]">
+          <Table className="mt-2 min-w-[940px]">
+            <colgroup>
+              <col className="w-[28%]" />
+              <col className="w-[18%]" />
+              <col className="w-[14%]" />
+              <col className="w-[10%]" />
+              <col className="w-[12%]" />
+              <col className="w-[14%]" />
+              <col className="w-[96px]" />
+            </colgroup>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[260px]">Nome</TableHead>
-                <TableHead className="w-[150px]">Telefone</TableHead>
-                <TableHead className="w-[140px]">Tag</TableHead>
-                <TableHead className="w-[90px]">Opt-in</TableHead>
-                <TableHead className="w-[120px]">Status</TableHead>
-                <TableHead className="w-[160px]">Atualizado</TableHead>
-                <TableHead className="w-[200px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
+                <TableHead>Nome</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Tag</TableHead>
+                <TableHead>Opt-in</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Atualizado</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -316,32 +325,34 @@ export function AdminContactsPage() {
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{statusBadge(c.status)}</TableCell>
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(c.updatedAt)}</TableCell>
-                  <TableCell className="text-right whitespace-nowrap sticky right-0 z-10 bg-card border-l">
-                    <div className="flex justify-end gap-1 flex-wrap">
+                  <TableCell className="text-right whitespace-nowrap">
+                    <div className="flex items-center justify-end gap-1">
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
                         onClick={() => {
                           const ok = window.confirm('Marcar este contato como OPT-OUT? Isso bloqueia novos envios.')
                           if (ok) optout.mutate(c.id)
                         }}
                         disabled={optout.isPending || c.status === 'OPTOUT'}
                         title="Opt-out"
-                        className="px-2"
+                        aria-label={`Aplicar opt-out em ${c.name}`}
                       >
                         <ShieldOff />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        className="h-8 w-8"
                         onClick={() => {
                           setEditing(c)
                           setOpen(true)
                         }}
-                        className="px-2"
+                        title="Editar"
+                        aria-label={`Editar ${c.name}`}
                       >
                         <Pencil className="h-4 w-4" />
-                        <span className="hidden xl:inline">Editar</span>
                       </Button>
                     </div>
                   </TableCell>

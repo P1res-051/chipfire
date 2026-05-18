@@ -422,13 +422,19 @@ export function AdminTemplatesPage() {
               }}
             />
           ) : (
-            <Table className="mt-2 min-w-[980px]">
+            <Table className="mt-2 min-w-[920px]">
+              <colgroup>
+                <col className="w-[24%]" />
+                <col className="w-[20%]" />
+                <col className="w-[44%]" />
+                <col className="w-[120px]" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[260px]">Nome</TableHead>
-                  <TableHead className="w-[200px]">Tags</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Tags</TableHead>
                   <TableHead>Prévia</TableHead>
-                  <TableHead className="w-[220px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -456,46 +462,47 @@ export function AdminTemplatesPage() {
                     <TableCell className="text-muted-foreground text-sm truncate" title={t.content}>
                       {t.content.length > 140 ? t.content.slice(0, 140) + '…' : t.content}
                     </TableCell>
-                    <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
-                      <div className="flex justify-end gap-1 flex-wrap">
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="outline"
+                          className="h-8 w-8"
                           onClick={async () => {
                             await navigator.clipboard.writeText(t.content)
                             toast({ title: 'Conteúdo copiado', variant: 'success' })
                           }}
                           title="Copiar"
-                          className="px-2"
+                          aria-label={`Copiar template ${t.name}`}
                         >
                           <Copy className="h-4 w-4" />
-                          <span className="hidden xl:inline">Copiar</span>
                         </Button>
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="secondary"
+                          className="h-8 w-8"
                           onClick={() => {
                             setEditing(t)
                             setOpen(true)
                           }}
-                          className="px-2"
+                          title="Editar"
+                          aria-label={`Editar template ${t.name}`}
                         >
                           <Pencil className="h-4 w-4" />
-                          <span className="hidden xl:inline">Editar</span>
                         </Button>
                         <Button
-                          size="sm"
+                          size="icon"
                           variant="destructive"
+                          className="h-8 w-8"
                           onClick={() => {
                             const ok = window.confirm('Remover template?')
                             if (ok) remove.mutate(t.id)
                           }}
                           disabled={remove.isPending}
                           title="Remover"
-                          className="px-2"
+                          aria-label={`Remover template ${t.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
-                          <span className="hidden xl:inline">Remover</span>
                         </Button>
                       </div>
                     </TableCell>

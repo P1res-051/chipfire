@@ -1,4 +1,4 @@
-import { zodResolver } from '@hookform/resolvers/zod'
+﻿import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Braces,
@@ -106,8 +106,8 @@ function modeBadge(m: ContentSelectionMode) {
 
 const groupSchema = z.object({
   name: z.string().min(2, 'Informe um nome'),
-  slug: z.string().min(2, 'Slug inválido').max(60, 'Slug muito longo'),
-  description: z.string().max(500, 'Máx 500 caracteres').optional(),
+  slug: z.string().min(2, 'Slug invÃ¡lido').max(60, 'Slug muito longo'),
+  description: z.string().max(500, 'MÃ¡x 500 caracteres').optional(),
   type: z.enum(['TEXT', 'IMAGE', 'VIDEO', 'AUDIO', 'DOCUMENT', 'MIXED']),
   selectionMode: z.enum(['RANDOM', 'SEQUENTIAL', 'WEIGHTED_RANDOM', 'LEAST_USED']),
   status: z.enum(['ACTIVE', 'INACTIVE']),
@@ -127,7 +127,7 @@ export function AdminContentGroupsPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
 
-  // filtros (client-side, pois a API não expõe query params)
+  // filtros (client-side, pois a API nÃ£o expÃµe query params)
   const [search, setSearch] = React.useState('')
   const [filterType, setFilterType] = React.useState<ContentGroupType | ''>('')
   const [filterStatus, setFilterStatus] = React.useState<ContentStatus | ''>('')
@@ -196,7 +196,7 @@ export function AdminContentGroupsPage() {
 
   function openEditGroup(g: ContentGroup) {
     setEditingGroup(g)
-    setSlugTouched(true) // não auto-altera em edição
+    setSlugTouched(true) // nÃ£o auto-altera em ediÃ§Ã£o
     groupForm.reset({
       name: g.name,
       slug: g.slug,
@@ -286,7 +286,7 @@ export function AdminContentGroupsPage() {
 
   const testResolve = useMutation({
     mutationFn: async (g: ContentGroup) => {
-      // Evidência dryRun: capturar stats antes/depois para o item escolhido
+      // EvidÃªncia dryRun: capturar stats antes/depois para o item escolhido
       const { data: beforeItems } = await api.get(`/content-groups/${g.id}/items`)
       const beforeMap = new Map(
         (beforeItems as ContentGroupItem[]).map((i) => [
@@ -330,7 +330,7 @@ export function AdminContentGroupsPage() {
       setResolveAudit(data.audit ?? null)
       setResolveOpen(true)
     },
-    onError: (e) => toast({ title: 'Falha no teste de resolução', description: getErrorMessage(e), variant: 'destructive' }),
+    onError: (e) => toast({ title: 'Falha no teste de resoluÃ§Ã£o', description: getErrorMessage(e), variant: 'destructive' }),
   })
 
   // items drawer/modal
@@ -368,7 +368,7 @@ export function AdminContentGroupsPage() {
 
   const itemTypeWatch = itemForm.watch('type')
 
-  // Mídias reais (para itens IMAGE/VIDEO/AUDIO/DOCUMENT)
+  // MÃ­dias reais (para itens IMAGE/VIDEO/AUDIO/DOCUMENT)
   const mediaForItems = useQuery({
     queryKey: ['admin', 'media', 'for-content-group-items', itemTypeWatch],
     enabled: itemModalOpen && itemTypeWatch !== 'TEXT',
@@ -376,7 +376,7 @@ export function AdminContentGroupsPage() {
       const params = new URLSearchParams()
       params.append('limit', '200')
 
-      // DOCUMENT: aceitamos DOCUMENT e PDF (não existe filtro multi-tipo no endpoint)
+      // DOCUMENT: aceitamos DOCUMENT e PDF (nÃ£o existe filtro multi-tipo no endpoint)
       if (itemTypeWatch && itemTypeWatch !== 'TEXT' && itemTypeWatch !== 'DOCUMENT') {
         params.append('type', itemTypeWatch)
       }
@@ -495,25 +495,25 @@ export function AdminContentGroupsPage() {
     },
     onSuccess: async (report) => {
       setImportReport(report)
-      toast({ title: 'Importação concluída', variant: report.errors ? 'destructive' : 'success' })
+      toast({ title: 'ImportaÃ§Ã£o concluÃ­da', variant: report.errors ? 'destructive' : 'success' })
       await qc.invalidateQueries({ queryKey: ['admin', 'content-groups'] })
     },
     onError: (e) => toast({ title: 'Falha ao importar', description: getErrorMessage(e), variant: 'destructive' }),
   })
 
   const loading = groups.isPending
-  const countLabel = groups.isPending ? 'Carregando…' : `${filtered.length} grupo(s)`
+  const countLabel = groups.isPending ? 'Carregandoâ€¦' : `${filtered.length} grupo(s)`
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold">Conteúdo Dinâmico</h1>
+            <h1 className="text-2xl font-semibold">ConteÃºdo DinÃ¢mico</h1>
             <ApiStatusPill />
           </div>
           <p className="text-sm text-muted-foreground">
-            Grupos de conteúdo que poderão ser usados depois como variáveis em Templates e Campanhas (ex.:{' '}
+            Grupos de conteÃºdo que poderÃ£o ser usados depois como variÃ¡veis em Templates e Campanhas (ex.:{' '}
             <span className="font-mono">{`{{grupo:meu-slug}}`}</span>).
           </p>
         </div>
@@ -559,7 +559,7 @@ export function AdminContentGroupsPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Modo de seleção</label>
+              <label className="text-sm text-muted-foreground">Modo de seleÃ§Ã£o</label>
               <Select value={filterMode} onChange={(e) => setFilterMode(e.target.value as any)}>
                 <option value="">Todos</option>
                 {(['RANDOM', 'SEQUENTIAL', 'WEIGHTED_RANDOM', 'LEAST_USED'] as ContentSelectionMode[]).map((m) => (
@@ -599,22 +599,32 @@ export function AdminContentGroupsPage() {
             <EmptyState
               icon={<Layers className="h-6 w-6" />}
               title="Nenhum grupo encontrado"
-              description="Crie seu primeiro grupo para usar como variável em templates e campanhas."
+              description="Crie seu primeiro grupo para usar como variÃ¡vel em templates e campanhas."
               primaryAction={{ label: 'Novo Grupo', onClick: openCreateGroup }}
               secondaryAction={{ label: 'Importar Excel', onClick: () => setImportOpen(true), variant: 'outline' }}
             />
           ) : (
-            <Table className="mt-2 min-w-[1200px]">
+            <Table className="mt-2 min-w-[1100px]">
+              <colgroup>
+                <col className="w-[18%]" />
+                <col className="w-[16%]" />
+                <col className="w-[10%]" />
+                <col className="w-[12%]" />
+                <col className="w-[10%]" />
+                <col className="w-[6%]" />
+                <col className="w-[18%]" />
+                <col className="w-[160px]" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[220px]">Nome</TableHead>
-                  <TableHead className="w-[200px]">Slug</TableHead>
-                  <TableHead className="w-[120px]">Tipo</TableHead>
-                  <TableHead className="w-[160px]">Modo</TableHead>
-                  <TableHead className="w-[120px]">Status</TableHead>
-                  <TableHead className="w-[70px]">Itens</TableHead>
-                  <TableHead className="w-[260px]">Variável</TableHead>
-                  <TableHead className="w-[260px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Slug</TableHead>
+                  <TableHead>Tipo</TableHead>
+                  <TableHead>Modo</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Itens</TableHead>
+                  <TableHead>VariÃ¡vel</TableHead>
+                  <TableHead className="text-right">AÃ§Ãµes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -640,51 +650,55 @@ export function AdminContentGroupsPage() {
                           <CopyVariableButton variable={variable} />
                         </div>
                       </TableCell>
-                      <TableCell className="text-right sticky right-0 z-10 bg-card border-l">
-                        <div className="flex flex-wrap justify-end gap-1">
-                          <Button size="sm" variant="secondary" onClick={() => openItems(g)}>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Button size="icon" variant="secondary" className="h-8 w-8" onClick={() => openItems(g)} title="Itens" aria-label={`Abrir itens de ${g.name}`}>
                             <Layers className="h-4 w-4" />
-                            <span className="hidden xl:inline">Itens</span>
                           </Button>
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="outline"
+                            className="h-8 w-8"
                             onClick={() => {
                               setResolveGroup(g)
                               testResolve.mutate(g)
                             }}
                             disabled={testResolve.isPending}
+                            title="Testar"
+                            aria-label={`Testar grupo ${g.name}`}
                           >
                             <FlaskConical className="h-4 w-4" />
-                            <span className="hidden xl:inline">Testar</span>
                           </Button>
-                          <Button size="sm" variant="outline" onClick={() => openEditGroup(g)}>
+                          <Button size="icon" variant="outline" className="h-8 w-8" onClick={() => openEditGroup(g)} title="Editar" aria-label={`Editar grupo ${g.name}`}>
                             <Pencil className="h-4 w-4" />
-                            <span className="hidden xl:inline">Editar</span>
                           </Button>
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="outline"
+                            className="h-8 w-8"
                             onClick={() => {
                               deactivateGroup.mutate(g)
                             }}
                             disabled={deactivateGroup.isPending}
+                            title={g.status === 'ACTIVE' ? 'Desativar' : 'Ativar'}
+                            aria-label={g.status === 'ACTIVE' ? `Desativar ${g.name}` : `Ativar ${g.name}`}
                           >
                             <Power className="h-4 w-4" />
-                            <span className="hidden xl:inline">{g.status === 'ACTIVE' ? 'Desativar' : 'Ativar'}</span>
                           </Button>
                           <Button
-                            size="sm"
+                            size="icon"
                             variant="destructive"
+                            className="h-8 w-8"
                             onClick={() => {
-                              const ok = window.confirm(`Excluir o grupo "${g.name}"? Isso removerá também os itens.`)
+                              const ok = window.confirm(`Excluir o grupo "${g.name}"? Isso removerÃ¡ tambÃ©m os itens.`)
                               if (!ok) return
                               deleteGroup.mutate(g)
                             }}
                             disabled={deleteGroup.isPending}
+                            title="Excluir"
+                            aria-label={`Excluir grupo ${g.name}`}
                           >
                             <Trash2 className="h-4 w-4" />
-                            <span className="hidden xl:inline">Excluir</span>
                           </Button>
                         </div>
                       </TableCell>
@@ -701,7 +715,7 @@ export function AdminContentGroupsPage() {
       <Dialog open={groupModalOpen} onOpenChange={setGroupModalOpen}>
         <DialogContent
           title={editingGroup ? 'Editar Grupo' : 'Novo Grupo'}
-          description="Gerencie grupos e modos de seleção. O slug será usado como variável."
+          description="Gerencie grupos e modos de seleÃ§Ã£o. O slug serÃ¡ usado como variÃ¡vel."
           className="max-w-2xl"
         >
           <form
@@ -735,7 +749,7 @@ export function AdminContentGroupsPage() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm text-muted-foreground">Descrição</label>
+              <label className="text-sm text-muted-foreground">DescriÃ§Ã£o</label>
               <Textarea rows={3} {...groupForm.register('description')} />
             </div>
 
@@ -749,7 +763,7 @@ export function AdminContentGroupsPage() {
                 </Select>
               </div>
               <div className="space-y-1">
-                <label className="text-sm text-muted-foreground">Modo de seleção</label>
+                <label className="text-sm text-muted-foreground">Modo de seleÃ§Ã£o</label>
                 <Select {...groupForm.register('selectionMode')}>
                   {(['RANDOM', 'SEQUENTIAL', 'WEIGHTED_RANDOM', 'LEAST_USED'] as ContentSelectionMode[]).map((m) => (
                     <option key={m} value={m}>{m}</option>
@@ -780,13 +794,13 @@ export function AdminContentGroupsPage() {
       {/* Modal Itens */}
       <Dialog open={itemsOpen} onOpenChange={setItemsOpen}>
         <DialogContent
-          title={itemsGroup ? `Itens · ${itemsGroup.name}` : 'Itens'}
-          description="Gerencie itens do grupo. Para itens de mídia, informe o mediaId."
+          title={itemsGroup ? `Itens Â· ${itemsGroup.name}` : 'Itens'}
+          description="Gerencie itens do grupo. Para itens de mÃ­dia, informe o mediaId."
           className="max-w-5xl"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {items.isPending ? 'Carregando…' : `${items.data?.length ?? 0} item(s)`}
+              {items.isPending ? 'Carregandoâ€¦' : `${items.data?.length ?? 0} item(s)`}
             </div>
             <Button onClick={openCreateItem} disabled={!itemsGroup}>
               <Plus /> Adicionar item
@@ -804,12 +818,12 @@ export function AdminContentGroupsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Conteúdo</TableHead>
+                  <TableHead>ConteÃºdo</TableHead>
                   <TableHead>Peso</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Uso</TableHead>
-                  <TableHead>Último uso</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead>Ãšltimo uso</TableHead>
+                  <TableHead className="text-right">AÃ§Ãµes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -824,10 +838,10 @@ export function AdminContentGroupsPage() {
                       ) : (
                         <div className="space-y-1">
                           <div className="text-xs">
-                            <span className="font-mono">mediaId:</span> {i.mediaId ?? '—'}
+                            <span className="font-mono">mediaId:</span> {i.mediaId ?? 'â€”'}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {i.media ? `${i.media.name} · ${i.media.slug} · ${i.media.type}` : 'Mídia não disponível (foi removida ou não existe).'}
+                            {i.media ? `${i.media.name} Â· ${i.media.slug} Â· ${i.media.type}` : 'MÃ­dia nÃ£o disponÃ­vel (foi removida ou nÃ£o existe).'}
                           </div>
                         </div>
                       )}
@@ -863,7 +877,7 @@ export function AdminContentGroupsPage() {
                 {!items.isPending && (items.data?.length ?? 0) === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="py-8 text-center text-sm text-muted-foreground">
-                      Este grupo ainda não possui itens.
+                      Este grupo ainda nÃ£o possui itens.
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -877,7 +891,7 @@ export function AdminContentGroupsPage() {
       <Dialog open={itemModalOpen} onOpenChange={setItemModalOpen}>
         <DialogContent
           title={editingItem ? 'Editar Item' : 'Adicionar Item'}
-          description="Itens TEXT usam textContent. Itens de mídia devem selecionar uma mídia real cadastrada."
+          description="Itens TEXT usam textContent. Itens de mÃ­dia devem selecionar uma mÃ­dia real cadastrada."
           className="max-w-2xl"
         >
           <form
@@ -889,7 +903,7 @@ export function AdminContentGroupsPage() {
                 return
               }
               if (v.type !== 'TEXT' && !(v.mediaId ?? '').trim()) {
-                toast({ title: 'Selecione uma mídia', variant: 'destructive' })
+                toast({ title: 'Selecione uma mÃ­dia', variant: 'destructive' })
                 return
               }
               if (editingItem) {
@@ -925,19 +939,19 @@ export function AdminContentGroupsPage() {
               </div>
             ) : (
               <div className="space-y-1">
-                <label className="text-sm text-muted-foreground">Mídia</label>
+                <label className="text-sm text-muted-foreground">MÃ­dia</label>
 
                 {mediaForItems.isPending ? (
                   <div className="rounded-lg border bg-secondary/20 p-3 text-sm text-muted-foreground">
-                    Carregando mídias…
+                    Carregando mÃ­diasâ€¦
                   </div>
                 ) : mediaForItems.isError ? (
                   <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
-                    Erro ao carregar mídias: {getErrorMessage(mediaForItems.error)}
+                    Erro ao carregar mÃ­dias: {getErrorMessage(mediaForItems.error)}
                   </div>
                 ) : (mediaForItems.data?.items?.length ?? 0) === 0 ? (
                   <div className="rounded-lg border bg-secondary/20 p-3 text-sm text-muted-foreground">
-                    Nenhuma mídia cadastrada. Cadastre uma mídia em Admin &gt; Mídia primeiro.
+                    Nenhuma mÃ­dia cadastrada. Cadastre uma mÃ­dia em Admin &gt; MÃ­dia primeiro.
                   </div>
                 ) : (
                   <>
@@ -945,10 +959,10 @@ export function AdminContentGroupsPage() {
                       value={(itemForm.getValues('mediaId') ?? '').trim()}
                       onChange={(e) => itemForm.setValue('mediaId', e.target.value, { shouldValidate: true })}
                     >
-                      <option value="">Selecione uma mídia</option>
+                      <option value="">Selecione uma mÃ­dia</option>
                       {(mediaForItems.data?.items ?? []).map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.name} · {m.slug} · {m.type} · {m.id}
+                          {m.name} Â· {m.slug} Â· {m.type} Â· {m.id}
                         </option>
                       ))}
                     </Select>
@@ -973,7 +987,7 @@ export function AdminContentGroupsPage() {
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold">{m.name}</div>
                             <div className="truncate font-mono text-xs text-muted-foreground">
-                              {m.slug} · {m.type} · {m.id}
+                              {m.slug} Â· {m.type} Â· {m.id}
                             </div>
                           </div>
                         </div>
@@ -1022,7 +1036,7 @@ export function AdminContentGroupsPage() {
                 <div>STATUS</div>
               </div>
               <div className="mt-2 text-xs">
-                Regras: TIPO=TEXT usa CONTEUDO. Tipos de mídia usam MEDIA_SLUG. Duplicados no mesmo grupo são ignorados.
+                Regras: TIPO=TEXT usa CONTEUDO. Tipos de mÃ­dia usam MEDIA_SLUG. Duplicados no mesmo grupo sÃ£o ignorados.
               </div>
             </div>
 
@@ -1052,7 +1066,7 @@ export function AdminContentGroupsPage() {
                 }}
                 disabled={importXlsx.isPending}
               >
-                {importXlsx.isPending ? 'Importando…' : 'Importar'}
+                {importXlsx.isPending ? 'Importandoâ€¦' : 'Importar'}
               </Button>
             </div>
 
@@ -1090,7 +1104,7 @@ export function AdminContentGroupsPage() {
                   </div>
                 ) : (
                   <div className="rounded-lg border border-neon-green/40 bg-neon-green/5 p-3 text-sm">
-                    Importação sem erros.
+                    ImportaÃ§Ã£o sem erros.
                   </div>
                 )}
               </div>
@@ -1102,8 +1116,8 @@ export function AdminContentGroupsPage() {
       {/* Modal test resolve */}
       <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
         <DialogContent
-          title={resolveGroup ? `Resultado do sorteio · ${resolveGroup.name}` : 'Resultado do sorteio'}
-          description="Item escolhido pela regra do grupo (dryRun=true: não deve incrementar usageCount/lastUsedAt)."
+          title={resolveGroup ? `Resultado do sorteio Â· ${resolveGroup.name}` : 'Resultado do sorteio'}
+          description="Item escolhido pela regra do grupo (dryRun=true: nÃ£o deve incrementar usageCount/lastUsedAt)."
           className="max-w-3xl"
         >
           {resolvedItem ? (
@@ -1115,28 +1129,28 @@ export function AdminContentGroupsPage() {
                   }`}
                 >
                   <div className={`font-semibold ${resolveAudit.unchanged ? 'text-neon-green' : 'text-destructive'}`}>
-                    Validação dryRun
+                    ValidaÃ§Ã£o dryRun
                   </div>
                   <div className="mt-2 grid gap-2 md:grid-cols-2">
                     <div className="rounded-md border bg-secondary/10 p-2">
                       <div className="text-xs text-muted-foreground">Antes</div>
                       <div className="mt-1 font-mono text-xs text-muted-foreground">
-                        usageCount: {resolveAudit.before?.usageCount ?? '—'}
+                        usageCount: {resolveAudit.before?.usageCount ?? 'â€”'}
                         <br />
-                        lastUsedAt: {resolveAudit.before?.lastUsedAt ? formatDateTime(resolveAudit.before.lastUsedAt) : '—'}
+                        lastUsedAt: {resolveAudit.before?.lastUsedAt ? formatDateTime(resolveAudit.before.lastUsedAt) : 'â€”'}
                       </div>
                     </div>
                     <div className="rounded-md border bg-secondary/10 p-2">
                       <div className="text-xs text-muted-foreground">Depois</div>
                       <div className="mt-1 font-mono text-xs text-muted-foreground">
-                        usageCount: {resolveAudit.after?.usageCount ?? '—'}
+                        usageCount: {resolveAudit.after?.usageCount ?? 'â€”'}
                         <br />
-                        lastUsedAt: {resolveAudit.after?.lastUsedAt ? formatDateTime(resolveAudit.after.lastUsedAt) : '—'}
+                        lastUsedAt: {resolveAudit.after?.lastUsedAt ? formatDateTime(resolveAudit.after.lastUsedAt) : 'â€”'}
                       </div>
                     </div>
                   </div>
                   <div className="mt-2 text-xs text-muted-foreground">
-                    Resultado: {resolveAudit.unchanged ? 'OK (sem incremento)' : 'ERRO (houve alteração)'}
+                    Resultado: {resolveAudit.unchanged ? 'OK (sem incremento)' : 'ERRO (houve alteraÃ§Ã£o)'}
                   </div>
                 </div>
               ) : null}
@@ -1156,15 +1170,15 @@ export function AdminContentGroupsPage() {
                 </div>
               ) : (
                 <div className="rounded-lg border bg-secondary/20 p-3">
-                  <div className="text-sm font-semibold">Mídia</div>
+                  <div className="text-sm font-semibold">MÃ­dia</div>
                   <div className="mt-2 space-y-1 text-sm text-muted-foreground">
                     <div>
-                      <span className="font-mono text-xs">mediaId:</span> {resolvedItem.mediaId ?? '—'}
+                      <span className="font-mono text-xs">mediaId:</span> {resolvedItem.mediaId ?? 'â€”'}
                     </div>
                     <div>
                       {resolvedItem.media
-                        ? `${resolvedItem.media.name} · ${resolvedItem.media.slug} · ${resolvedItem.media.type}`
-                        : 'Mídia não disponível (foi removida ou não existe).'}
+                        ? `${resolvedItem.media.name} Â· ${resolvedItem.media.slug} Â· ${resolvedItem.media.type}`
+                        : 'MÃ­dia nÃ£o disponÃ­vel (foi removida ou nÃ£o existe).'}
                     </div>
                   </div>
                 </div>

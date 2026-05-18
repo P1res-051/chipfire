@@ -312,14 +312,21 @@ export function AdminLogsPage() {
               description="Ajuste o filtro de ação (ex.: ADMIN_USER_CREATE) ou o intervalo de datas."
             />
           ) : (
-            <Table className="mt-2 min-w-[900px]">
+            <Table className="mt-2 min-w-[980px]">
+              <colgroup>
+                <col className="w-[16%]" />
+                <col className="w-[22%]" />
+                <col className="w-[20%]" />
+                <col className="w-[28%]" />
+                <col className="w-[14%]" />
+              </colgroup>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[170px]">Quando</TableHead>
-                  <TableHead className="w-[260px]">Usuário</TableHead>
-                  <TableHead className="w-[220px]">Ação</TableHead>
+                  <TableHead>Quando</TableHead>
+                  <TableHead>Usuário</TableHead>
+                  <TableHead>Ação</TableHead>
                   <TableHead>Entidade</TableHead>
-                  <TableHead className="w-[160px]">IP</TableHead>
+                  <TableHead>IP</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
