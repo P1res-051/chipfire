@@ -17,7 +17,6 @@ import { useToast } from '@/components/ui/toast'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { getErrorMessage } from '@/lib/http'
-import { cn } from '@/lib/utils'
 
 type InstanceStatus = 'WAITING_QR' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'PAUSED'
 
@@ -335,17 +334,27 @@ export function AdminInstancesPage() {
             <div className="text-sm text-destructive">{getErrorMessage(instances.error)}</div>
           ) : null}
 
-          <Table className="mt-2 min-w-[1200px]">
+          <Table className="mt-2 min-w-[1040px]">
+            <colgroup>
+              <col className="w-[18%]" />
+              <col className="w-[24%]" />
+              <col className="w-[12%]" />
+              <col className="w-[13%]" />
+              <col className="w-[9%]" />
+              <col className="w-[13%]" />
+              <col className="w-[13%]" />
+              <col className="w-[130px]" />
+            </colgroup>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-[190px]">Instância</TableHead>
-                <TableHead className="w-[260px]">Usuário</TableHead>
-                <TableHead className="w-[140px]">Status</TableHead>
-                <TableHead className="w-[160px]">Telefone</TableHead>
-                <TableHead className="w-[110px]">Msgs hoje</TableHead>
-                <TableHead className="w-[160px]">Saúde</TableHead>
-                <TableHead className="w-[170px]">Última atividade</TableHead>
-                <TableHead className={cn('w-[240px] text-right sticky right-0 z-20 bg-card border-l')}>Ações</TableHead>
+                <TableHead>Instância</TableHead>
+                <TableHead>Usuário</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Telefone</TableHead>
+                <TableHead>Msgs</TableHead>
+                <TableHead>Saúde</TableHead>
+                <TableHead>Última atividade</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -361,8 +370,8 @@ export function AdminInstancesPage() {
                   <TableCell className="text-muted-foreground whitespace-nowrap" title={i.phoneNumber ?? ''}>
                     {i.phoneNumber ?? '—'}
                   </TableCell>
-                  <TableCell>{(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}</TableCell>
-                  <TableCell className="text-muted-foreground max-w-[160px] truncate" title={getHealthInfo(i).title}>
+                  <TableCell className="text-center">{(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}</TableCell>
+                  <TableCell className="text-muted-foreground truncate" title={getHealthInfo(i).title}>
                     {(() => {
                       const h = getHealthInfo(i)
                       return (
@@ -378,11 +387,14 @@ export function AdminInstancesPage() {
                     })()}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(i.lastActivityAt)}</TableCell>
-                  <TableCell className={cn('text-right sticky right-0 z-10 bg-card border-l')}>
-                    <div className="flex flex-wrap justify-end gap-1">
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        className="h-8 w-8"
+                        title="Mostrar QR Code"
+                        aria-label={`Mostrar QR Code de ${i.instanceName}`}
                         onClick={() => {
                           setQrTitle(`QR Code · ${i.instanceName}`)
                           fetchQr.mutate(i)
@@ -390,20 +402,24 @@ export function AdminInstancesPage() {
                         disabled={fetchQr.isPending}
                       >
                         <QrCode className="h-4 w-4" />
-                        <span className="hidden xl:inline">QR</span>
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
+                        title="Consultar status"
+                        aria-label={`Consultar status de ${i.instanceName}`}
                         onClick={() => fetchStatus.mutate(i)}
                         disabled={fetchStatus.isPending}
                       >
                         <RefreshCcw className="h-4 w-4" />
-                        <span className="hidden xl:inline">Status</span>
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
+                        title="Reconectar"
+                        aria-label={`Reconectar ${i.instanceName}`}
                         onClick={() => {
                           const ok = window.confirm(`Reconectar a instância "${i.instanceName}"?`)
                           if (!ok) return
@@ -412,11 +428,13 @@ export function AdminInstancesPage() {
                         disabled={reconnect.isPending}
                       >
                         <PlugZap className="h-4 w-4" />
-                        <span className="hidden xl:inline">Reconnect</span>
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
+                        title="Desconectar"
+                        aria-label={`Desconectar ${i.instanceName}`}
                         onClick={() => {
                           const ok = window.confirm(`Desconectar a instância "${i.instanceName}"?`)
                           if (!ok) return
@@ -425,11 +443,13 @@ export function AdminInstancesPage() {
                         disabled={disconnect.isPending}
                       >
                         <Unplug className="h-4 w-4" />
-                        <span className="hidden xl:inline">Disconnect</span>
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="destructive"
+                        className="h-8 w-8"
+                        title="Remover"
+                        aria-label={`Remover ${i.instanceName}`}
                         onClick={() => {
                           const ok = window.confirm(`Remover instância "${i.instanceName}"?`)
                           if (ok) remove.mutate(i)
@@ -437,7 +457,6 @@ export function AdminInstancesPage() {
                         disabled={remove.isPending}
                       >
                         <Trash2 className="h-4 w-4" />
-                        <span className="hidden xl:inline">Remover</span>
                       </Button>
                     </div>
                   </TableCell>
