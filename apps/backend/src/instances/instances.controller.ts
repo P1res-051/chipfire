@@ -104,6 +104,11 @@ export class InstancesController {
     return this.maturation.updateEnabled(user, id, dto.enabled)
   }
 
+  @Post(':id/maturation/trigger')
+  triggerMaturation(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
+    return this.maturation.triggerNow(user, id)
+  }
+
   @Delete(':id')
   delete(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.instances.delete(user, id);

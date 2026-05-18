@@ -85,20 +85,34 @@ export class InstancesService {
 
   async listForUser(user: JwtPayload) {
     if (user.role === UserRole.ADMIN) {
-      return this.prisma.whatsAppInstance.findMany({
+      const instances = await this.prisma.whatsAppInstance.findMany({
         orderBy: { createdAt: 'desc' },
-        include: { user: { select: { id: true, name: true, email: true } } },
+        include: {
+          user: { select: { id: true, name: true, email: true } },
+          maturationLogs: {
+            take: 1,
+            orderBy: { occurredAt: 'desc' },
+          },
+        },
       });
+      return this.enrichWithMaturation(instances)
     }
 
-    return this.prisma.whatsAppInstance.findMany({
+    const instances = await this.prisma.whatsAppInstance.findMany({
       where: { userId: user.sub },
       orderBy: { createdAt: 'desc' },
+      include: {
+        maturationLogs: {
+          take: 1,
+          orderBy: { occurredAt: 'desc' },
+        },
+      },
     });
+    return this.enrichWithMaturation(instances)
   }
 
   async listAdmin(filters: { userId?: string; status?: InstanceStatus } = {}) {
-    return this.prisma.whatsAppInstance.findMany({
+    const instances = await this.prisma.whatsAppInstance.findMany({
       where: {
         userId: filters.userId,
         status: filters.status,
@@ -106,8 +120,13 @@ export class InstancesService {
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { id: true, name: true, email: true, status: true, role: true } },
+        maturationLogs: {
+          take: 1,
+          orderBy: { occurredAt: 'desc' },
+        },
       },
     });
+    return this.enrichWithMaturation(instances)
   }
 
   async createForUser(userId: string, input: { instanceName: string; phoneNumber?: string }) {
@@ -288,5 +307,30 @@ export class InstancesService {
     }
     await this.prisma.whatsAppInstance.delete({ where: { id: instanceId } });
     return { ok: true };
+  }
+
+  private async enrichWithMaturation(instances: any[]) {
+    if (instances.length === 0) return instances
+
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const counts = await this.prisma.instanceMaturationLog.groupBy({
+      by: ['originInstanceId'],
+      where: {
+        originInstanceId: { in: instances.map((instance) => instance.id) },
+        occurredAt: { gte: today },
+        status: 'SENT',
+      },
+      _count: { _all: true },
+    })
+
+    const countsMap = new Map(counts.map((row) => [row.originInstanceId, row._count._all]))
+
+    return instances.map((instance) => ({
+      ...instance,
+      maturationMessagesToday: countsMap.get(instance.id) ?? 0,
+      lastMaturationLog: instance.maturationLogs?.[0] ?? null,
+    }))
   }
 }

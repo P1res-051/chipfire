@@ -6,6 +6,7 @@ import { InstanceMaturationService } from './instance-maturation.service'
 
 type MaturationJob = {
   instanceId: string
+  targetInstanceId?: string | null
 }
 
 @Processor('instance-maturation-queue')
@@ -17,7 +18,7 @@ export class InstanceMaturationProcessor extends WorkerHost {
   }
 
   async process(job: Job<MaturationJob>) {
-    await this.maturationService.process(job.data.instanceId)
+    await this.maturationService.process(job.data.instanceId, job.data.targetInstanceId)
   }
 
   @OnWorkerEvent('failed')

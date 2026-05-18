@@ -25,13 +25,24 @@ type Instance = {
   phoneNumber: string | null
   status: InstanceStatus
   maturationEnabled: boolean
+  maturationNextSendAt: string | null
   maturationLastSentAt: string | null
+  maturationLastQueueAt: string | null
+  maturationCurrentTargetName: string | null
   qrCode: string | null
   messagesSentToday: number
   messagesReceivedToday: number
+  maturationMessagesToday: number
   healthScore: number
   healthLabel: string
   lastActivityAt: string | null
+  lastMaturationLog: {
+    targetInstanceName: string
+    templateName: string | null
+    occurredAt: string
+    status: string
+    errorMessage: string | null
+  } | null
   createdAt: string
 }
 
@@ -55,6 +66,18 @@ function statusBadge(status: InstanceStatus) {
     default:
       return <Badge variant="destructive">ERROR</Badge>
   }
+}
+
+function formatCountdown(target: string | null, now: number) {
+  if (!target) return 'Sem agendamento'
+  const diff = new Date(target).getTime() - now
+  if (Number.isNaN(diff)) return 'Sem agendamento'
+  if (diff <= 0) return 'Disparando...'
+
+  const totalSeconds = Math.floor(diff / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
 
 export function UserInstancesPage() {
@@ -89,6 +112,7 @@ export function UserInstancesPage() {
   const [qrError, setQrError] = React.useState<string | null>(null)
   const [qrImageSrc, setQrImageSrc] = React.useState<string | null>(null)
   const [qrInstanceId, setQrInstanceId] = React.useState<string | null>(null)
+  const [nowTs, setNowTs] = React.useState(() => Date.now())
 
   const closeQr = React.useCallback(() => {
     setQrOpen(false)
@@ -280,6 +304,27 @@ export function UserInstancesPage() {
       }),
   })
 
+  const triggerMaturation = useMutation({
+    mutationFn: async (instance: Instance) => {
+      const { data } = await api.post(`/instances/${instance.id}/maturation/trigger`)
+      return data as { ok: boolean }
+    },
+    onSuccess: async () => {
+      toast({
+        title: 'Disparo enfileirado',
+        description: 'A mensagem de maturação foi colocada para envio imediato.',
+        variant: 'success',
+      })
+      await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    },
+    onError: (e) =>
+      toast({
+        title: 'Falha ao disparar agora',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
+  })
+
   React.useEffect(() => {
     if (!qrOpen || !qrInstanceId) return
 
@@ -303,6 +348,28 @@ export function UserInstancesPage() {
       variant: 'success',
     })
   }, [closeQr, instances.data, qrInstanceId, qrOpen, toast])
+
+  React.useEffect(() => {
+    const hasEnabled = (instances.data ?? []).some((instance) => instance.maturationEnabled)
+    if (!hasEnabled) return
+
+    const timer = window.setInterval(() => {
+      void qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    }, 15000)
+
+    return () => window.clearInterval(timer)
+  }, [instances.data, qc])
+
+  React.useEffect(() => {
+    const hasEnabled = (instances.data ?? []).some((instance) => instance.maturationEnabled)
+    if (!hasEnabled) return
+
+    const timer = window.setInterval(() => {
+      setNowTs(Date.now())
+    }, 1000)
+
+    return () => window.clearInterval(timer)
+  }, [instances.data])
 
   return (
     <div className="space-y-6">
@@ -366,7 +433,12 @@ export function UserInstancesPage() {
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Lista</CardTitle>
+          <div className="space-y-1">
+            <CardTitle>Lista</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Quando a maturacao estiver ligada, a instancia entra na fila e esta tela se atualiza sozinha.
+            </p>
+          </div>
           <div className="text-sm text-muted-foreground">
             {instances.isPending ? 'Carregando...' : `${instances.data?.length ?? 0} registros`}
           </div>
@@ -376,7 +448,18 @@ export function UserInstancesPage() {
             <div className="text-sm text-destructive">{getErrorMessage(instances.error)}</div>
           ) : null}
 
-          <Table className="mt-2">
+          <Table className="mt-2 min-w-[1240px]">
+            <colgroup>
+              <col className="w-[14%]" />
+              <col className="w-[9%]" />
+              <col className="w-[11%]" />
+              <col className="w-[7%]" />
+              <col className="w-[10%]" />
+              <col className="w-[14%]" />
+              <col className="w-[12%]" />
+              <col className="w-[14%]" />
+              <col className="w-[9%]" />
+            </colgroup>
             <TableHeader>
               <TableRow>
                 <TableHead>Instancia</TableHead>
@@ -385,6 +468,7 @@ export function UserInstancesPage() {
                 <TableHead>Msgs hoje</TableHead>
                 <TableHead>Saude</TableHead>
                 <TableHead>Maturacao</TableHead>
+                <TableHead>Destino atual</TableHead>
                 <TableHead>Ultima atividade</TableHead>
                 <TableHead className="text-right">Acoes</TableHead>
               </TableRow>
@@ -395,18 +479,28 @@ export function UserInstancesPage() {
                   <TableCell className="font-medium">{i.instanceName}</TableCell>
                   <TableCell>{statusBadge(i.status)}</TableCell>
                   <TableCell className="text-muted-foreground">{i.phoneNumber ?? '-'}</TableCell>
-                  <TableCell>{(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}</TableCell>
+                  <TableCell className="text-center">
+                    {(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}
+                  </TableCell>
                   <TableCell className="text-muted-foreground">
                     {i.healthScore ?? 0}% · {i.healthLabel}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {i.maturationEnabled ? (
                       <div className="space-y-1">
-                        <Badge variant="success">Na fila</Badge>
+                        <Badge variant="success">Ligada</Badge>
                         <div className="text-xs text-muted-foreground">
-                          {i.maturationLastSentAt
-                            ? `Ultimo envio ${formatDateTime(i.maturationLastSentAt)}`
-                            : 'Aguardando disparo'}
+                          Proximo envio em: {formatCountdown(i.maturationNextSendAt, nowTs)}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Maturacao hoje: {i.maturationMessagesToday ?? 0}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {i.lastMaturationLog
+                            ? `${i.instanceName} -> ${i.lastMaturationLog.targetInstanceName} as ${formatDateTime(i.lastMaturationLog.occurredAt)}`
+                            : i.maturationLastQueueAt
+                              ? `Na fila desde: ${formatDateTime(i.maturationLastQueueAt)}`
+                              : 'Entrando na fila'}
                         </div>
                       </div>
                     ) : (
@@ -414,42 +508,63 @@ export function UserInstancesPage() {
                     )}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
+                    {i.maturationEnabled ? i.maturationCurrentTargetName ?? 'Definindo...' : '-'}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
                     {formatDateTime(i.lastActivityAt)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex justify-end gap-2">
+                    <div className="flex items-center justify-end gap-1">
                       <Button
                         size="sm"
+                        variant="secondary"
+                        className="h-8 px-3"
+                        title="Disparar agora"
+                        onClick={() => triggerMaturation.mutate(i)}
+                        disabled={!i.maturationEnabled || triggerMaturation.isPending}
+                      >
+                        Disparar agora
+                      </Button>
+                      <Button
+                        size="icon"
                         variant={i.maturationEnabled ? 'secondary' : 'outline'}
+                        className="h-8 w-8"
+                        title={i.maturationEnabled ? 'Pausar maturacao' : 'Ligar maturacao'}
                         onClick={() =>
                           toggleMaturation.mutate({ instance: i, enabled: !i.maturationEnabled })
                         }
                         disabled={toggleMaturation.isPending}
                       >
-                        {i.maturationEnabled ? 'Pausar maturacao' : 'Ligar maturacao'}
+                        {i.maturationEnabled ? <RefreshCcw /> : <PlugZap />}
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="secondary"
+                        className="h-8 w-8"
+                        title="Mostrar QR Code"
                         onClick={() => {
                           setQrTitle(`QR Code · ${i.instanceName}`)
                           fetchQr.mutate(i)
                         }}
                         disabled={fetchQr.isPending}
                       >
-                        <QrCode /> QR
+                        <QrCode />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
+                        title="Consultar status"
                         onClick={() => fetchStatus.mutate(i)}
                         disabled={fetchStatus.isPending}
                       >
-                        <RefreshCcw /> Status
+                        <RefreshCcw />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
+                        title="Desconectar"
                         onClick={() => {
                           const ok = window.confirm(`Desconectar a instancia "${i.instanceName}"?`)
                           if (!ok) return
@@ -457,11 +572,13 @@ export function UserInstancesPage() {
                         }}
                         disabled={disconnect.isPending}
                       >
-                        <Unplug /> Disconnect
+                        <Unplug />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="outline"
+                        className="h-8 w-8"
+                        title="Reconectar"
                         onClick={() => {
                           const ok = window.confirm(`Reconectar a instancia "${i.instanceName}"?`)
                           if (!ok) return
@@ -469,18 +586,20 @@ export function UserInstancesPage() {
                         }}
                         disabled={reconnect.isPending}
                       >
-                        <PlugZap /> Reconnect
+                        <PlugZap />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="destructive"
+                        className="h-8 w-8"
+                        title="Remover"
                         onClick={() => {
                           const ok = window.confirm(`Remover instancia "${i.instanceName}"?`)
                           if (ok) remove.mutate(i)
                         }}
                         disabled={remove.isPending}
                       >
-                        <Trash2 /> Remover
+                        <Trash2 />
                       </Button>
                     </div>
                   </TableCell>
@@ -488,7 +607,7 @@ export function UserInstancesPage() {
               ))}
               {!instances.isPending && (instances.data?.length ?? 0) === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="py-6 text-center text-sm text-muted-foreground">
                     Nenhuma instancia encontrada.
                   </TableCell>
                 </TableRow>

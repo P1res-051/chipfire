@@ -13,15 +13,9 @@ const MAX_DELAY_MS = 7 * 60 * 1000
 
 type MaturationJob = {
   instanceId: string
+  targetInstanceId?: string | null
+  triggerNow?: boolean
 }
-
-const MATURATION_MESSAGES = [
-  'Oi! Passando para manter a conversa ativa por aqui.',
-  'Tudo certo? So dando um oi rapido para manter o numero aquecido.',
-  'Mensagem curta de rotina para manter a atividade do WhatsApp.',
-  'Ola! Seguimos com a maturacao automatica desta instancia.',
-  'Passando para registrar atividade e manter o fluxo natural de mensagens.',
-]
 
 @Injectable()
 export class InstanceMaturationService implements OnModuleInit {
@@ -60,27 +54,73 @@ export class InstanceMaturationService implements OnModuleInit {
       data: {
         maturationEnabled: enabled,
         maturationLastQueueAt: enabled ? new Date() : null,
+        maturationNextSendAt: enabled ? new Date(Date.now() + 10_000) : null,
+        maturationCurrentTargetId: enabled ? instance.maturationCurrentTargetId : null,
+        maturationCurrentTargetName: enabled ? instance.maturationCurrentTargetName : null,
       },
     })
 
     if (enabled) {
       await this.enqueue(instanceId, 10_000)
+    } else {
+      await this.prisma.whatsAppInstance.update({
+        where: { id: instanceId },
+        data: {
+          maturationCurrentTargetId: null,
+          maturationCurrentTargetName: null,
+          maturationNextSendAt: null,
+        },
+      })
     }
 
     return updated
   }
 
-  async enqueue(instanceId: string, delayMs?: number) {
+  async triggerNow(user: JwtPayload, instanceId: string) {
+    const instance = await this.prisma.whatsAppInstance.findUnique({
+      where: { id: instanceId },
+    })
+
+    if (!instance) {
+      throw new NotFoundException('Instancia nao encontrada')
+    }
+
+    if (user.role !== UserRole.ADMIN && instance.userId !== user.sub) {
+      throw new ForbiddenException('Acesso negado para esta instancia')
+    }
+
+    if (!instance.maturationEnabled) {
+      throw new ForbiddenException('Ative a maturacao antes de disparar manualmente')
+    }
+
+    await this.enqueue(instanceId, 1000, true)
+    return { ok: true }
+  }
+
+  async enqueue(instanceId: string, delayMs?: number, triggerNow: boolean = false) {
+    const instance = await this.prisma.whatsAppInstance.findUnique({
+      where: { id: instanceId },
+    })
+
+    if (!instance || !instance.maturationEnabled) return
+
+    const target = await this.pickTarget(instance)
     const delay = typeof delayMs === 'number' ? delayMs : this.randomDelay()
+    const nextSendAt = new Date(Date.now() + delay)
 
     await this.prisma.whatsAppInstance.update({
       where: { id: instanceId },
-      data: { maturationLastQueueAt: new Date() },
+      data: {
+        maturationLastQueueAt: new Date(),
+        maturationNextSendAt: nextSendAt,
+        maturationCurrentTargetId: target?.id ?? null,
+        maturationCurrentTargetName: target?.instanceName ?? null,
+      },
     }).catch(() => undefined)
 
     await this.maturationQueue.add(
       'instance-maturation',
-      { instanceId },
+      { instanceId, targetInstanceId: target?.id ?? null, triggerNow },
       {
         delay,
         removeOnComplete: true,
@@ -89,7 +129,7 @@ export class InstanceMaturationService implements OnModuleInit {
     )
   }
 
-  async process(instanceId: string) {
+  async process(instanceId: string, jobTargetId?: string | null) {
     const origin = await this.prisma.whatsAppInstance.findUnique({
       where: { id: instanceId },
     })
@@ -98,6 +138,94 @@ export class InstanceMaturationService implements OnModuleInit {
       return
     }
 
+    const target = jobTargetId
+      ? await this.prisma.whatsAppInstance.findFirst({
+          where: {
+            id: jobTargetId,
+            userId: origin.userId,
+            maturationEnabled: true,
+            status: InstanceStatus.CONNECTED,
+            phoneNumber: { not: null },
+          },
+        })
+      : await this.pickTarget(origin)
+
+    if (
+      origin.status !== InstanceStatus.CONNECTED ||
+      !origin.phoneNumber ||
+      !target ||
+      !target.phoneNumber
+    ) {
+      this.logger.debug(
+        `[maturation] instance=${origin.instanceName} aguardando pares aptos`,
+      )
+      await this.enqueue(origin.id)
+      return
+    }
+
+    const template = await this.pickTemplate(origin.userId)
+    const text = this.renderTemplate(template.content, origin.instanceName, target.instanceName)
+    const occurredAt = new Date()
+
+    if (!text.trim()) {
+      await this.createLog({
+        origin,
+        target,
+        text: '',
+        templateId: template.id,
+        templateName: template.name,
+        status: 'SKIPPED',
+        errorMessage: 'Template vazio apos processamento',
+        occurredAt,
+      })
+      await this.enqueue(origin.id)
+      return
+    }
+
+    try {
+      await this.evolution.sendText(origin.instanceName, target.phoneNumber, text)
+      await this.createLog({
+        origin,
+        target,
+        text,
+        templateId: template.id,
+        templateName: template.name,
+        status: 'SENT',
+        occurredAt,
+      })
+    } catch (error: any) {
+      await this.createLog({
+        origin,
+        target,
+        text,
+        templateId: template.id,
+        templateName: template.name,
+        status: 'ERROR',
+        errorMessage: error?.message ?? 'Falha ao enviar mensagem de maturacao',
+        occurredAt,
+      })
+      throw error
+    }
+
+    await this.prisma.whatsAppInstance.update({
+      where: { id: origin.id },
+      data: {
+        maturationLastSentAt: occurredAt,
+        lastActivityAt: occurredAt,
+        maturationCurrentTargetId: target.id,
+        maturationCurrentTargetName: target.instanceName,
+        maturationNextSendAt: null,
+      },
+    })
+
+    this.logger.log(
+      `[maturation] ${origin.instanceName} -> ${target.instanceName} (${target.phoneNumber})`,
+    )
+
+    await this.enqueue(origin.id)
+  }
+
+  private async pickTarget(origin: { id: string; userId: string }) {
     const eligibleTargets = await this.prisma.whatsAppInstance.findMany({
       where: {
         userId: origin.userId,
@@ -109,48 +237,59 @@ export class InstanceMaturationService implements OnModuleInit {
       orderBy: [{ maturationLastSentAt: 'asc' }, { updatedAt: 'asc' }],
     })
 
-    if (
-      origin.status !== InstanceStatus.CONNECTED ||
-      !origin.phoneNumber ||
-      eligibleTargets.length === 0
-    ) {
-      this.logger.debug(
-        `[maturation] instance=${origin.instanceName} aguardando pares aptos`,
-      )
-      await this.enqueue(origin.id)
-      return
-    }
+    if (eligibleTargets.length === 0) return null
 
-    const target =
+    return (
       eligibleTargets[Math.floor(Math.random() * Math.min(eligibleTargets.length, 3))] ??
       eligibleTargets[0]
-
-    const text = this.buildMessage(origin.instanceName, target.instanceName)
-
-    await this.evolution.sendText(origin.instanceName, target.phoneNumber, text)
-
-    const occurredAt = new Date()
-
-    await this.prisma.whatsAppInstance.update({
-      where: { id: origin.id },
-      data: {
-        maturationLastSentAt: occurredAt,
-        lastActivityAt: occurredAt,
-      },
-    })
-
-    this.logger.log(
-      `[maturation] ${origin.instanceName} -> ${target.instanceName} (${target.phoneNumber})`,
     )
-
-    await this.enqueue(origin.id)
   }
 
-  private buildMessage(originName: string, targetName: string) {
-    const base =
-      MATURATION_MESSAGES[Math.floor(Math.random() * MATURATION_MESSAGES.length)] ??
-      MATURATION_MESSAGES[0]
-    return `${base} [${originName} -> ${targetName}]`
+  private async pickTemplate(userId: string) {
+    const templates = await this.prisma.messageTemplate.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      select: { id: true, name: true, content: true },
+    })
+
+    if (templates.length === 0) {
+      throw new NotFoundException('Nenhum template encontrado para usar na maturacao')
+    }
+
+    return templates[Math.floor(Math.random() * templates.length)] ?? templates[0]
+  }
+
+  private renderTemplate(content: string, originName: string, targetName: string) {
+    return content
+      .replaceAll('{{instancia_origem}}', originName)
+      .replaceAll('{{instancia_destino}}', targetName)
+      .trim()
+  }
+
+  private async createLog(params: {
+    origin: { id: string }
+    target: { id: string; instanceName: string; phoneNumber: string | null }
+    text: string
+    templateId?: string | null
+    templateName?: string | null
+    status: string
+    errorMessage?: string | null
+    occurredAt: Date
+  }) {
+    await this.prisma.instanceMaturationLog.create({
+      data: {
+        originInstanceId: params.origin.id,
+        targetInstanceId: params.target.id,
+        targetInstanceName: params.target.instanceName,
+        targetPhoneNumber: params.target.phoneNumber,
+        templateId: params.templateId ?? null,
+        templateName: params.templateName ?? null,
+        text: params.text,
+        status: params.status,
+        errorMessage: params.errorMessage ?? null,
+        occurredAt: params.occurredAt,
+      },
+    })
   }
 
   private randomDelay() {

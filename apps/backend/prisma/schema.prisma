@@ -135,8 +135,11 @@ model WhatsAppInstance {
   phoneNumber           String?
   status                InstanceStatus @default(WAITING_QR)
   maturationEnabled     Boolean        @default(false)
+  maturationNextSendAt  DateTime?
   maturationLastSentAt  DateTime?
   maturationLastQueueAt DateTime?
+  maturationCurrentTargetId   String?
+  maturationCurrentTargetName String?
   qrCode                String?
   provider              String         @default("EVOLUTION")
   connectedAt           DateTime?
@@ -157,6 +160,7 @@ model WhatsAppInstance {
   healthSnapshots   HealthSnapshot[]
   webhookEvents     WebhookEvent[]
   messageLogs       MessageLog[]
+  maturationLogs    InstanceMaturationLog[]
   campaignInstances CampaignInstance[]
   aiAgentInstances  AiAgentInstance[]
   typebotFlows      TypebotFlow[]
@@ -167,6 +171,25 @@ model WhatsAppInstance {
   @@unique([userId, instanceName])
   @@index([userId])
   @@index([status])
+}
+
+model InstanceMaturationLog {
+  id                 String   @id @default(cuid())
+  originInstanceId   String
+  targetInstanceId   String?
+  targetInstanceName String
+  targetPhoneNumber  String?
+  templateId         String?
+  templateName       String?
+  text               String
+  status             String   @default("SENT")
+  errorMessage       String?
+  occurredAt         DateTime @default(now())
+
+  originInstance WhatsAppInstance @relation(fields: [originInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([originInstanceId])
+  @@index([occurredAt])
 }
 
 model Contact {
