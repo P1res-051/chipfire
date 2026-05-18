@@ -99,6 +99,28 @@ export function AdminInstancesPage() {
   const [qrTitle, setQrTitle] = React.useState<string>('QR Code')
   const [qrError, setQrError] = React.useState<string | null>(null)
   const [qrImageSrc, setQrImageSrc] = React.useState<string | null>(null)
+  const [qrInstanceId, setQrInstanceId] = React.useState<string | null>(null)
+
+  const closeQr = React.useCallback(() => {
+    setQrOpen(false)
+    setQrValue(null)
+    setQrTitle('QR Code')
+    setQrError(null)
+    setQrImageSrc(null)
+    setQrInstanceId(null)
+  }, [])
+
+  const handleQrOpenChange = React.useCallback(
+    (open: boolean) => {
+      if (open) {
+        setQrOpen(true)
+        return
+      }
+
+      closeQr()
+    },
+    [closeQr],
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -170,9 +192,10 @@ export function AdminInstancesPage() {
       const { data } = await api.get(`/instances/${instance.id}/qrcode`)
       return data as { success: boolean; qrcode?: string; code?: string; message?: string }
     },
-    onSuccess: (data) => {
+    onSuccess: (data, instance) => {
       setQrError(!data.success ? data.message ?? 'QR Code não disponível' : null)
       setQrValue(data.qrcode ?? data.code ?? null)
+      setQrInstanceId(instance.id)
       setQrOpen(true)
     },
     onError: (e) =>
@@ -232,6 +255,30 @@ export function AdminInstancesPage() {
     onError: (e) =>
       toast({ title: 'Falha ao remover', description: getErrorMessage(e), variant: 'destructive' }),
   })
+
+  React.useEffect(() => {
+    if (!qrOpen || !qrInstanceId) return
+
+    const timer = window.setInterval(() => {
+      void qc.invalidateQueries({ queryKey: ['admin', 'instances'] })
+    }, 2500)
+
+    return () => window.clearInterval(timer)
+  }, [qrOpen, qrInstanceId, qc])
+
+  React.useEffect(() => {
+    if (!qrOpen || !qrInstanceId) return
+
+    const current = (instances.data ?? []).find((i) => i.id === qrInstanceId)
+    if (current?.status !== 'CONNECTED') return
+
+    closeQr()
+    toast({
+      title: 'Instância conectada',
+      description: current.phoneNumber ? `Telefone ${current.phoneNumber}` : undefined,
+      variant: 'success',
+    })
+  }, [closeQr, instances.data, qrInstanceId, qrOpen, toast])
 
   function getHealthInfo(i: Instance) {
     const tooltip =
@@ -523,7 +570,7 @@ export function AdminInstancesPage() {
       </Dialog>
 
       {/* QR */}
-      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+      <Dialog open={qrOpen} onOpenChange={handleQrOpenChange}>
         <DialogContent title={qrTitle} description="Use este QR Code para conectar o WhatsApp.">
           {qrError ? (
             <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">

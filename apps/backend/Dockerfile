@@ -17,10 +17,14 @@ CMD ["npm","run","start:dev"]
 FROM deps AS build
 ENV NODE_ENV=production
 COPY . .
-RUN rm -f tsconfig.build.tsbuildinfo && npm run build
+RUN find src \( -name '*.js' -o -name '*.js.map' -o -name '*.d.ts' \) -delete \
+  && rm -rf dist tsconfig.build.tsbuildinfo \
+  && npm run build \
+  && npm prune --omit=dev \
+  && rm -rf node_modules/prisma node_modules/typescript node_modules/@types
 
 FROM base AS prod
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY prisma ./prisma
 EXPOSE 3000
