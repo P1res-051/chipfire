@@ -28,6 +28,24 @@ function pickEventType(headers: Record<string, any>, payload: any): string {
   );
 }
 
+function pickConnectedPhone(payload: any): string | null {
+  const raw =
+    payload?.data?.wuid ??
+    payload?.wuid ??
+    payload?.data?.sender ??
+    payload?.sender ??
+    payload?.data?.ownerJid ??
+    payload?.ownerJid ??
+    payload?.data?.instance?.wuid ??
+    payload?.instance?.wuid ??
+    null;
+
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+
+  const phone = normalizeBrazilPhone(raw.split('@')[0]);
+  return phone || null;
+}
+
 @Controller('webhooks')
 export class WebhooksController {
   constructor(
@@ -96,10 +114,14 @@ export class WebhooksController {
             : state === 'close'
               ? InstanceStatus.DISCONNECTED
               : InstanceStatus.ERROR;
+        const phoneNumber = status === InstanceStatus.CONNECTED ? pickConnectedPhone(body) : null;
+
         await this.prisma.whatsAppInstance.update({
           where: { id: instance.id },
           data: {
             status,
+            phoneNumber: phoneNumber ?? undefined,
+            qrCode: status === InstanceStatus.CONNECTED ? null : undefined,
             connectedAt: status === InstanceStatus.CONNECTED ? new Date() : undefined,
             disconnectedAt: status === InstanceStatus.DISCONNECTED ? new Date() : undefined,
           },
