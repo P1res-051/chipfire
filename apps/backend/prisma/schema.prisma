@@ -282,6 +282,7 @@ model MediaLibrary {
 
   user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   contentGroupItems ContentGroupItem[]
+  templates         MessageTemplate[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -338,15 +339,18 @@ model MessageTemplate {
   userId  String
   name    String
   content String
+  mediaId String?
   tags    String[]
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  media     MediaLibrary? @relation(fields: [mediaId], references: [id], onDelete: SetNull)
   campaigns Campaign[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+  @@index([mediaId])
 }
 
 model TypebotFlow {

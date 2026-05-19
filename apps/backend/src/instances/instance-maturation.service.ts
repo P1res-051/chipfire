@@ -23,6 +23,7 @@ type MaturationTemplate = {
   id: string | null
   name: string
   content: string
+  mediaId?: string | null
   ownerUserId: string | null
   isFallback?: boolean
 }
@@ -442,12 +443,32 @@ export class InstanceMaturationService implements OnModuleInit {
       .replace(/\[M[ií]dia: [^\]]+\]/gi, '')
       .trim()
 
-    if (!text) {
+    const directTemplateMedia =
+      template.mediaId
+        ? await this.prisma.mediaLibrary.findUnique({
+            where: { id: template.mediaId },
+            select: { id: true, name: true, publicUrl: true, filePath: true, type: true },
+          })
+        : null
+
+    if (!text && !directTemplateMedia && resolved.dynamicMedia.length === 0) {
       text = this.buildFallbackTemplate().content
       text = this.renderTemplate(text, origin.instanceName, target.instanceName)
     }
 
     const firstMedia = resolved.dynamicMedia[0]
+    if (!firstMedia && directTemplateMedia && (directTemplateMedia.publicUrl || directTemplateMedia.filePath)) {
+      return {
+        text,
+        primaryMedia: {
+          slug: 'template-media',
+          type: this.normalizeMessageType(directTemplateMedia.type),
+          mediaUrl: directTemplateMedia.publicUrl ?? directTemplateMedia.filePath ?? '',
+          fileName: directTemplateMedia.name,
+        },
+      }
+    }
+
     if (!firstMedia) {
       return { text, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string } }
     }
@@ -544,7 +565,7 @@ export class InstanceMaturationService implements OnModuleInit {
     const templates = await this.prisma.messageTemplate.findMany({
       where: { userId },
       orderBy: { updatedAt: 'desc' },
-      select: { id: true, name: true, content: true, userId: true },
+      select: { id: true, name: true, content: true, mediaId: true, userId: true },
     })
 
     if (templates.length > 0) {
@@ -555,7 +576,7 @@ export class InstanceMaturationService implements OnModuleInit {
     const adminTemplates = await this.prisma.messageTemplate.findMany({
       where: { user: { role: UserRole.ADMIN } },
       orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
-      select: { id: true, name: true, content: true, userId: true },
+      select: { id: true, name: true, content: true, mediaId: true, userId: true },
       take: 20,
     })
 
@@ -565,6 +586,7 @@ export class InstanceMaturationService implements OnModuleInit {
         id: template.id,
         name: `${template.name} (admin)`,
         content: template.content,
+        mediaId: template.mediaId,
         ownerUserId: template.userId,
       }
     }
@@ -578,6 +600,7 @@ export class InstanceMaturationService implements OnModuleInit {
       name: 'Fallback automatico',
       content:
         'Ola! Aqui e {{instancia_origem}} falando com {{instancia_destino}} para aquecer a instancia.',
+      mediaId: null,
       ownerUserId: null,
       isFallback: true,
     }

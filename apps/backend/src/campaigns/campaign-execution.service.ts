@@ -229,7 +229,12 @@ export class CampaignExecutionService {
         }
       }
 
-      // Se não houver mídia dinâmica, usar mídia estática da campanha
+      // Se não houver mídia dinâmica, usar mídia principal do template
+      if (!primaryMedia && template.mediaId) {
+        primaryMedia = await this.prisma.mediaLibrary.findUnique({ where: { id: template.mediaId } })
+      }
+
+      // Se não houver mídia no template, usar mídia estática da campanha
       if (!primaryMedia && mediaId) {
         primaryMedia = await this.prisma.mediaLibrary.findUnique({ where: { id: mediaId } })
       }

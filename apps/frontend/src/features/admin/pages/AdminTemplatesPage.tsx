@@ -1,6 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, FileText, Layers, Loader2, Pencil, Plus, Search, Trash2, Wand2 } from 'lucide-react'
+import {
+  Copy,
+  FileAudio,
+  FileImage,
+  FileText,
+  FileVideo,
+  Layers,
+  Loader2,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Wand2,
+  X,
+} from 'lucide-react'
 import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -19,26 +33,33 @@ import { CopyVariableButton } from '@/features/admin/components/CopyVariableButt
 import { api } from '@/lib/api'
 import { getErrorMessage } from '@/lib/http'
 
+type MediaType = 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'DOCUMENT' | 'TEXT'
+type ContentGroupType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'MIXED'
+type ContentStatus = 'ACTIVE' | 'INACTIVE'
+
+type MediaAsset = {
+  id: string
+  userId: string
+  name: string
+  slug: string
+  type: MediaType
+  filePath: string | null
+  publicUrl: string | null
+  mimeType: string | null
+  tags: string[]
+}
+
 type Template = {
   id: string
   userId: string
   name: string
   content: string
+  mediaId: string | null
+  media?: Pick<MediaAsset, 'id' | 'name' | 'slug' | 'type' | 'publicUrl' | 'mimeType'> | null
   tags: string[]
   createdAt: string
   updatedAt: string
 }
-
-const schema = z.object({
-  name: z.string().min(2, 'Informe o nome'),
-  content: z.string().min(1, 'Informe o conteúdo'),
-  tags: z.string().optional(),
-})
-
-type FormValues = z.infer<typeof schema>
-
-type ContentGroupType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'MIXED'
-type ContentStatus = 'ACTIVE' | 'INACTIVE'
 
 type ContentGroup = {
   id: string
@@ -47,7 +68,6 @@ type ContentGroup = {
   type: ContentGroupType
   selectionMode: 'RANDOM' | 'SEQUENTIAL' | 'WEIGHTED_RANDOM' | 'LEAST_USED'
   status: ContentStatus
-  _count?: { items: number }
 }
 
 type ContentGroupItem = {
@@ -55,9 +75,6 @@ type ContentGroupItem = {
   type: ContentGroupType
   textContent: string | null
   mediaId: string | null
-  weight: number
-  usageCount: number
-  lastUsedAt: string | null
   media?: { id: string; name: string; slug: string; type: string; publicUrl?: string | null } | null
 }
 
@@ -82,6 +99,20 @@ type DynamicPreviewAudit = {
   errors: string[]
 }
 
+const schema = z
+  .object({
+    name: z.string().min(2, 'Informe o nome'),
+    content: z.string(),
+    mediaId: z.string().optional(),
+    tags: z.string().optional(),
+  })
+  .refine((value) => Boolean(value.content.trim()) || Boolean((value.mediaId ?? '').trim()), {
+    message: 'Informe um texto ou selecione uma midia principal',
+    path: ['content'],
+  })
+
+type FormValues = z.infer<typeof schema>
+
 const variables = [
   '{{nome}}',
   '{{telefone}}',
@@ -89,15 +120,21 @@ const variables = [
   '{{data}}',
   '{{hora}}',
   '{{saudacao}}',
-  '{{midia:slug}}',
-  '{{texto:slug}}',
   '{{grupo:slug}}',
 ]
+
+function mediaTypeBadge(type: MediaType) {
+  if (type === 'IMAGE') return <Badge variant="outline">Imagem</Badge>
+  if (type === 'VIDEO') return <Badge variant="outline">Video</Badge>
+  if (type === 'AUDIO') return <Badge variant="outline">Audio</Badge>
+  if (type === 'TEXT') return <Badge variant="default">Texto</Badge>
+  return <Badge variant="outline">Documento</Badge>
+}
 
 function groupTypeBadge(type: ContentGroupType) {
   const variant = type === 'TEXT' ? 'default' : type === 'MIXED' ? 'warning' : 'outline'
   return (
-    <Badge variant={variant as any} className="font-mono">
+    <Badge variant={variant as never} className="font-mono">
       {type}
     </Badge>
   )
@@ -111,6 +148,13 @@ export function AdminTemplatesPage() {
   const { toast } = useToast()
   const qc = useQueryClient()
   const [q, setQ] = React.useState('')
+  const [open, setOpen] = React.useState(false)
+  const [editing, setEditing] = React.useState<Template | null>(null)
+  const [groupPickerOpen, setGroupPickerOpen] = React.useState(false)
+  const [groupSearch, setGroupSearch] = React.useState('')
+  const [mediaPickerOpen, setMediaPickerOpen] = React.useState(false)
+  const [mediaSearch, setMediaSearch] = React.useState('')
+  const [simulatedAudit, setSimulatedAudit] = React.useState<DynamicPreviewAudit | null>(null)
 
   const templates = useQuery({
     queryKey: ['templates'],
@@ -120,10 +164,6 @@ export function AdminTemplatesPage() {
     },
   })
 
-  const [open, setOpen] = React.useState(false)
-  const [editing, setEditing] = React.useState<Template | null>(null)
-
-  // grupos dinâmicos (usados para inserir variável e simular preview)
   const contentGroups = useQuery({
     queryKey: ['content-groups'],
     enabled: open,
@@ -133,49 +173,71 @@ export function AdminTemplatesPage() {
     },
   })
 
+  const mediaLibrary = useQuery({
+    queryKey: ['admin', 'media', 'template-picker'],
+    enabled: open || mediaPickerOpen,
+    queryFn: async () => {
+      const { data } = await api.get('/media?limit=200')
+      const raw = data as { items?: MediaAsset[] }
+      return raw.items ?? []
+    },
+  })
+
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { name: '', content: '', tags: '' },
+    defaultValues: { name: '', content: '', mediaId: '', tags: '' },
   })
+
+  const contentValue = form.watch('content')
 
   React.useEffect(() => {
     if (!editing) return
     form.reset({
       name: editing.name,
       content: editing.content,
+      mediaId: editing.mediaId ?? '',
       tags: editing.tags.join(', '),
     })
   }, [editing, form])
+
+  React.useEffect(() => {
+    if (!open) {
+      setSimulatedAudit(null)
+      return
+    }
+    setSimulatedAudit(null)
+  }, [contentValue, open])
 
   const save = useMutation({
     mutationFn: async (payload: { id?: string; values: FormValues }) => {
       const tags = (payload.values.tags ?? '')
         .split(',')
-        .map((t) => t.trim())
+        .map((tag) => tag.trim())
         .filter(Boolean)
-      if (payload.id) {
-        const { data } = await api.patch(`/templates/${payload.id}`, {
-          name: payload.values.name,
-          content: payload.values.content,
-          tags,
-        })
-        return data as Template
-      }
-      const { data } = await api.post('/templates', {
+      const data = {
         name: payload.values.name,
         content: payload.values.content,
+        mediaId: (payload.values.mediaId ?? '').trim() || null,
         tags,
-      })
-      return data as Template
+      }
+
+      if (payload.id) {
+        const response = await api.patch(`/templates/${payload.id}`, data)
+        return response.data as Template
+      }
+
+      const response = await api.post('/templates', data)
+      return response.data as Template
     },
     onSuccess: async () => {
       toast({ title: editing ? 'Template atualizado' : 'Template criado', variant: 'success' })
       setOpen(false)
       setEditing(null)
-      form.reset()
+      form.reset({ name: '', content: '', mediaId: '', tags: '' })
       await qc.invalidateQueries({ queryKey: ['templates'] })
     },
-    onError: (e) => toast({ title: 'Falha ao salvar', description: getErrorMessage(e), variant: 'destructive' }),
+    onError: (error) =>
+      toast({ title: 'Falha ao salvar', description: getErrorMessage(error), variant: 'destructive' }),
   })
 
   const remove = useMutation({
@@ -187,97 +249,77 @@ export function AdminTemplatesPage() {
       toast({ title: 'Template removido', variant: 'success' })
       await qc.invalidateQueries({ queryKey: ['templates'] })
     },
-    onError: (e) => toast({ title: 'Falha ao remover', description: getErrorMessage(e), variant: 'destructive' }),
+    onError: (error) =>
+      toast({ title: 'Falha ao remover', description: getErrorMessage(error), variant: 'destructive' }),
   })
 
   const filtered = React.useMemo(() => {
     const needle = q.trim().toLowerCase()
     const data = templates.data ?? []
     if (!needle) return data
-    return data.filter((t) => t.name.toLowerCase().includes(needle) || t.content.toLowerCase().includes(needle))
+    return data.filter((template) => {
+      const blob = [
+        template.name,
+        template.content,
+        template.media?.name,
+        template.media?.slug,
+        template.tags.join(' '),
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return blob.includes(needle)
+    })
   }, [q, templates.data])
 
-  function insertAtCursor(textarea: HTMLTextAreaElement | null, value: string) {
-    if (!textarea) return
-    const start = textarea.selectionStart ?? textarea.value.length
-    const end = textarea.selectionEnd ?? textarea.value.length
-    const next = textarea.value.slice(0, start) + value + textarea.value.slice(end)
-    form.setValue('content', next, { shouldDirty: true })
-    requestAnimationFrame(() => {
-      textarea.focus()
-      textarea.setSelectionRange(start + value.length, start + value.length)
-    })
-  }
+  const selectedMediaId = form.watch('mediaId') ?? ''
+  const selectedMedia = React.useMemo(
+    () => (mediaLibrary.data ?? []).find((item) => item.id === selectedMediaId) ?? null,
+    [mediaLibrary.data, selectedMediaId],
+  )
 
-  const contentRef = React.useRef<HTMLTextAreaElement | null>(null)
-  const contentRegister = form.register('content')
-  const contentValue = form.watch('content')
-
-  // Inserir grupo dinâmico
-  const [groupPickerOpen, setGroupPickerOpen] = React.useState(false)
-  const [groupSearch, setGroupSearch] = React.useState('')
+  const mediaOptions = React.useMemo(() => {
+    const needle = mediaSearch.trim().toLowerCase()
+    return (mediaLibrary.data ?? [])
+      .filter((item) => item.type !== 'TEXT')
+      .filter((item) => {
+        if (!needle) return true
+        return `${item.name} ${item.slug} ${item.type}`.toLowerCase().includes(needle)
+      })
+  }, [mediaLibrary.data, mediaSearch])
 
   const activeGroups = React.useMemo(() => {
     const data = contentGroups.data ?? []
     const needle = groupSearch.trim().toLowerCase()
     return data
-      .filter((g) => g.status === 'ACTIVE')
-      .filter((g) => {
+      .filter((group) => group.status === 'ACTIVE')
+      .filter((group) => {
         if (!needle) return true
-        return `${g.name} ${g.slug}`.toLowerCase().includes(needle)
+        return `${group.name} ${group.slug}`.toLowerCase().includes(needle)
       })
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [contentGroups.data, groupSearch])
 
-  // Preview dinâmico
-  const [simulatedAudit, setSimulatedAudit] = React.useState<DynamicPreviewAudit | null>(null)
-
-  React.useEffect(() => {
-    if (!open) {
-      setSimulatedAudit(null)
-      return
-    }
-    // se o conteúdo mudar, limpa preview simulado (evita confusão)
-    setSimulatedAudit(null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contentValue, open])
+  const contentRef = React.useRef<HTMLTextAreaElement | null>(null)
+  const contentRegister = form.register('content')
 
   const validationWarnings = React.useMemo(() => {
     const content = contentValue || ''
     const slugs = findGroupSlugs(content)
     if (!slugs.length) return []
 
-    // só valida quando a lista de grupos já está disponível
     const groups = contentGroups.data ?? []
     if (!groups.length) return []
 
-    const map = new Map(groups.map((g) => [g.slug.toLowerCase(), g]))
+    const map = new Map(groups.map((group) => [group.slug.toLowerCase(), group]))
     const warnings: string[] = []
     for (const slug of slugs) {
-      const g = map.get(slug)
-      if (!g || g.status !== 'ACTIVE') warnings.push(`Grupo dinâmico não encontrado ou inativo: ${slug}`)
+      const group = map.get(slug)
+      if (!group || group.status !== 'ACTIVE') warnings.push(`Grupo dinamico nao encontrado ou inativo: ${slug}`)
     }
     return warnings
   }, [contentGroups.data, contentValue])
-
-  function findGroupSlugs(content: string) {
-    // aceita hífen e underscore (ex.: {{grupo:saudacao}} / {{grupo:saudacao_teste}})
-    const regex = /\{\{grupo:([a-z0-9-_]+)\}\}/gi
-    const slugs = new Set<string>()
-    let m: RegExpExecArray | null
-    while ((m = regex.exec(content))) {
-      slugs.add(m[1].toLowerCase())
-    }
-    return [...slugs]
-  }
-
-  function renderResolvedItem(item: ContentGroupItem) {
-    if (item.type === 'TEXT') return item.textContent ?? ''
-    const name = item.media?.name ?? 'mídia'
-    const slug = item.media?.slug ?? item.mediaId ?? '—'
-    const type = item.media?.type ?? item.type
-    return `[Mídia dinâmica: ${name} / ${slug} / ${type}]`
-  }
 
   const simulateDynamic = useMutation({
     mutationFn: async (content: string) => {
@@ -288,44 +330,43 @@ export function AdminTemplatesPage() {
           renderedText: content,
           dynamicGroups: [],
           dynamicMedia: [],
-          warnings: [] as string[],
-          errors: [] as string[],
+          warnings: [],
+          errors: [],
         } satisfies DynamicPreviewAudit
       }
 
       const groups = contentGroups.data ?? []
-      const map = new Map(groups.map((g) => [g.slug.toLowerCase(), g]))
-
+      const map = new Map(groups.map((group) => [group.slug.toLowerCase(), group]))
       const warnings: string[] = []
       const errors: string[] = []
       const resolvedBySlug = new Map<string, string>()
       const auditGroups: DynamicPreviewAudit['dynamicGroups'] = []
       const auditMedia: DynamicPreviewAudit['dynamicMedia'] = []
 
-      // resolve em paralelo, uma chamada por slug
       await Promise.all(
         slugs.map(async (slug) => {
-          const g = map.get(slug)
-          if (!g || g.status !== 'ACTIVE') {
-            warnings.push(`Grupo dinâmico não encontrado ou inativo: ${slug}`)
+          const group = map.get(slug)
+          if (!group || group.status !== 'ACTIVE') {
+            warnings.push(`Grupo dinamico nao encontrado ou inativo: ${slug}`)
             resolvedBySlug.set(slug, `{{grupo:${slug}}}`)
-            auditGroups.push({ slug, groupId: g?.id })
+            auditGroups.push({ slug, groupId: group?.id })
             return
           }
+
           try {
-            const { data } = await api.post(`/content-groups/${g.id}/test-resolve?dryRun=true`)
-            const item = (data as any)?.item as ContentGroupItem | undefined
+            const { data } = await api.post(`/content-groups/${group.id}/test-resolve?dryRun=true`)
+            const item = (data as { item?: ContentGroupItem }).item
+
             if (!item) {
-              warnings.push(`Falha ao resolver grupo dinâmico: ${slug}`)
+              warnings.push(`Falha ao resolver grupo dinamico: ${slug}`)
               resolvedBySlug.set(slug, `{{grupo:${slug}}}`)
-              auditGroups.push({ slug, groupId: g.id })
+              auditGroups.push({ slug, groupId: group.id })
               return
             }
 
             const resolvedText = renderResolvedItem(item)
             resolvedBySlug.set(slug, resolvedText)
-
-            auditGroups.push({ slug, groupId: g.id, itemId: item.id, resolvedText })
+            auditGroups.push({ slug, groupId: group.id, itemId: item.id, resolvedText })
 
             if (item.type !== 'TEXT' && item.mediaId) {
               auditMedia.push({
@@ -337,18 +378,17 @@ export function AdminTemplatesPage() {
                 publicUrl: item.media?.publicUrl ?? undefined,
               })
             }
-          } catch (e: any) {
-            errors.push(`Erro ao resolver grupo ${slug}: ${getErrorMessage(e)}`)
+          } catch (error) {
+            errors.push(`Erro ao resolver grupo ${slug}: ${getErrorMessage(error)}`)
             resolvedBySlug.set(slug, `{{grupo:${slug}}}`)
-            auditGroups.push({ slug, groupId: g.id })
+            auditGroups.push({ slug, groupId: group.id })
           }
         }),
       )
 
-      // substituição final
       const renderedText = content.replace(/\{\{grupo:([a-z0-9-_]+)\}\}/gi, (_full, slugRaw) => {
-        const s = String(slugRaw).toLowerCase()
-        return resolvedBySlug.get(s) ?? `{{grupo:${s}}}`
+        const normalizedSlug = String(slugRaw).toLowerCase()
+        return resolvedBySlug.get(normalizedSlug) ?? `{{grupo:${normalizedSlug}}}`
       })
 
       return {
@@ -360,15 +400,19 @@ export function AdminTemplatesPage() {
         errors,
       } satisfies DynamicPreviewAudit
     },
-    onSuccess: (res) => {
-      setSimulatedAudit(res)
+    onSuccess: (result) => {
+      setSimulatedAudit(result)
       toast({
-        title: 'Simulação concluída',
-        variant: res.errors.length || res.warnings.length ? 'destructive' : 'success',
+        title: 'Simulacao concluida',
+        variant: result.errors.length || result.warnings.length ? 'destructive' : 'success',
       })
     },
-    onError: (e: any) =>
-      toast({ title: 'Falha ao simular conteúdo dinâmico', description: getErrorMessage(e), variant: 'destructive' }),
+    onError: (error) =>
+      toast({
+        title: 'Falha ao simular conteudo dinamico',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      }),
   })
 
   return (
@@ -379,12 +423,14 @@ export function AdminTemplatesPage() {
             <h1 className="text-2xl font-semibold">Templates</h1>
             <ApiStatusPill />
           </div>
-          <p className="text-sm text-muted-foreground">Crie mensagens autorizadas com variáveis e preview estilo WhatsApp.</p>
+          <p className="text-sm text-muted-foreground">
+            Crie templates com texto, variaveis e uma midia principal real para campanha e maturacao.
+          </p>
         </div>
         <Button
           onClick={() => {
             setEditing(null)
-            form.reset({ name: '', content: '', tags: '' })
+            form.reset({ name: '', content: '', mediaId: '', tags: '' })
             setOpen(true)
           }}
           className="flex-1 md:flex-none"
@@ -395,14 +441,16 @@ export function AdminTemplatesPage() {
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center">
         <div className="flex-1">
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou conteúdo…" />
+          <Input value={q} onChange={(event) => setQ(event.target.value)} placeholder="Buscar por nome, texto ou midia..." />
         </div>
       </div>
 
       <Card>
         <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Lista</CardTitle>
-          <div className="text-sm text-muted-foreground">{templates.isPending ? 'Carregando…' : `${filtered.length} registros`}</div>
+          <div className="text-sm text-muted-foreground">
+            {templates.isPending ? 'Carregando...' : `${filtered.length} registros`}
+          </div>
         </CardHeader>
         <CardContent>
           {templates.isError ? <div className="text-sm text-destructive">{getErrorMessage(templates.error)}</div> : null}
@@ -411,56 +459,85 @@ export function AdminTemplatesPage() {
             <EmptyState
               icon={<FileText className="h-6 w-6" />}
               title="Nenhum template encontrado"
-              description="Crie seu primeiro template com variáveis e preview estilo WhatsApp."
+              description="Crie seu primeiro template multimidia com texto, variaveis e midia principal."
               primaryAction={{
                 label: 'Novo template',
                 onClick: () => {
                   setEditing(null)
-                  form.reset({ name: '', content: '', tags: '' })
+                  form.reset({ name: '', content: '', mediaId: '', tags: '' })
                   setOpen(true)
                 },
               }}
             />
           ) : (
-            <Table className="mt-2 min-w-[920px]">
+            <Table className="mt-2 min-w-[1080px]">
               <colgroup>
-                <col className="w-[24%]" />
-                <col className="w-[20%]" />
-                <col className="w-[44%]" />
+                <col className="w-[22%]" />
+                <col className="w-[18%]" />
+                <col className="w-[18%]" />
+                <col className="w-[30%]" />
                 <col className="w-[120px]" />
               </colgroup>
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
+                  <TableHead>Midia principal</TableHead>
                   <TableHead>Tags</TableHead>
-                  <TableHead>Prévia</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
+                  <TableHead>Previa</TableHead>
+                  <TableHead className="text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((t) => (
-                  <TableRow key={t.id}>
-                    <TableCell className="font-medium max-w-[260px] truncate" title={t.name}>
-                      {t.name}
+                {filtered.map((template) => (
+                  <TableRow key={template.id}>
+                    <TableCell className="max-w-[240px]">
+                      <div className="truncate font-medium" title={template.name}>
+                        {template.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {template.media ? (
+                        <div className="flex items-center gap-2">
+                          {mediaTypeBadge(template.media.type as MediaType)}
+                          <span className="truncate text-sm text-muted-foreground" title={template.media.name}>
+                            {template.media.name}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Sem midia</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
-                      {t.tags.length ? (
+                      {template.tags.length ? (
                         <div className="flex flex-wrap gap-1">
-                          {t.tags.slice(0, 6).map((tag) => (
+                          {template.tags.slice(0, 6).map((tag) => (
                             <Badge key={tag} className="text-xs" variant="outline" title={tag}>
-                              {tag.length > 16 ? tag.slice(0, 16) + '…' : tag}
+                              {tag.length > 16 ? `${tag.slice(0, 16)}...` : tag}
                             </Badge>
                           ))}
-                          {t.tags.length > 6 ? (
-                            <Badge variant="outline" className="text-xs">{`+${t.tags.length - 6}`}</Badge>
+                          {template.tags.length > 6 ? (
+                            <Badge variant="outline" className="text-xs">{`+${template.tags.length - 6}`}</Badge>
                           ) : null}
                         </div>
                       ) : (
                         '—'
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-sm truncate" title={t.content}>
-                      {t.content.length > 140 ? t.content.slice(0, 140) + '…' : t.content}
+                    <TableCell className="text-sm text-muted-foreground">
+                      <div className="space-y-1">
+                        {template.content ? (
+                          <div className="line-clamp-2" title={template.content}>
+                            {template.content}
+                          </div>
+                        ) : (
+                          <div className="italic text-muted-foreground">Template so com midia principal</div>
+                        )}
+                        {template.media ? (
+                          <div className="text-xs">
+                            Envia junto com <span className="font-medium">{template.media.name}</span>
+                          </div>
+                        ) : null}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -469,11 +546,11 @@ export function AdminTemplatesPage() {
                           variant="outline"
                           className="h-8 w-8"
                           onClick={async () => {
-                            await navigator.clipboard.writeText(t.content)
-                            toast({ title: 'Conteúdo copiado', variant: 'success' })
+                            await navigator.clipboard.writeText(template.content)
+                            toast({ title: 'Conteudo copiado', variant: 'success' })
                           }}
-                          title="Copiar"
-                          aria-label={`Copiar template ${t.name}`}
+                          title="Copiar texto"
+                          aria-label={`Copiar template ${template.name}`}
                         >
                           <Copy className="h-4 w-4" />
                         </Button>
@@ -482,11 +559,11 @@ export function AdminTemplatesPage() {
                           variant="secondary"
                           className="h-8 w-8"
                           onClick={() => {
-                            setEditing(t)
+                            setEditing(template)
                             setOpen(true)
                           }}
                           title="Editar"
-                          aria-label={`Editar template ${t.name}`}
+                          aria-label={`Editar template ${template.name}`}
                         >
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -495,12 +572,12 @@ export function AdminTemplatesPage() {
                           variant="destructive"
                           className="h-8 w-8"
                           onClick={() => {
-                            const ok = window.confirm('Remover template?')
-                            if (ok) remove.mutate(t.id)
+                            const confirmed = window.confirm('Remover template?')
+                            if (confirmed) remove.mutate(template.id)
                           }}
                           disabled={remove.isPending}
                           title="Remover"
-                          aria-label={`Remover template ${t.name}`}
+                          aria-label={`Remover template ${template.name}`}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -515,153 +592,203 @@ export function AdminTemplatesPage() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent title={editing ? 'Editar template' : 'Novo template'} description="Use formatação WhatsApp (* _ ~ ``` ) e variáveis.">
-          <form
-            className="space-y-4"
-            onSubmit={form.handleSubmit((values) => save.mutate({ id: editing?.id, values }))}
-          >
-            <Field label="Nome" error={form.formState.errors.name?.message}>
-              <Input {...form.register('name')} />
-            </Field>
+        <DialogContent
+          title={editing ? 'Editar template' : 'Novo template'}
+          description="Texto e midia principal sao independentes. Voce pode salvar so texto, so midia ou os dois."
+          className="max-w-6xl"
+        >
+          <form className="space-y-5" onSubmit={form.handleSubmit((values) => save.mutate({ id: editing?.id, values }))}>
+            <div className="grid gap-5 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="space-y-4">
+                <Field label="Nome" error={form.formState.errors.name?.message}>
+                  <Input {...form.register('name')} />
+                </Field>
 
-            <div className="space-y-2">
-              <div className="flex flex-wrap gap-2">
-                {variables.map((v) => (
-                  <Button
-                    key={v}
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => insertAtCursor(contentRef.current, v)}
-                  >
-                    {v}
-                  </Button>
-                ))}
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => {
-                    setGroupSearch('')
-                    setGroupPickerOpen(true)
-                  }}
-                >
-                  <Layers /> Inserir Grupo Dinâmico
-                </Button>
-                <Button type="button" size="sm" variant="outline" onClick={() => insertAtCursor(contentRef.current, '😀')}>
-                  Emoji
-                </Button>
-              </div>
-              <Field label="Conteúdo" error={form.formState.errors.content?.message}>
-                <Textarea
-                  rows={8}
-                  {...contentRegister}
-                  ref={(el) => {
-                    contentRegister.ref(el)
-                    contentRef.current = el
-                  }}
-                  placeholder="Olá {{nome}}, tudo bem?..."
-                />
-              </Field>
-            </div>
+                <div className="rounded-xl border bg-secondary/10 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-medium">Midia principal</div>
+                      <div className="text-xs text-muted-foreground">
+                        Essa midia acompanha o template como imagem, video, audio ou documento.
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setMediaSearch('')
+                          setMediaPickerOpen(true)
+                        }}
+                      >
+                        <Plus /> Escolher midia
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={!selectedMedia}
+                        onClick={() => form.setValue('mediaId', '', { shouldDirty: true, shouldValidate: true })}
+                      >
+                        <X /> Remover
+                      </Button>
+                    </div>
+                  </div>
 
-            <Field label="Tags (vírgula)">
-              <Input {...form.register('tags')} placeholder="Ex.: onboarding, suporte" />
-            </Field>
+                  {selectedMedia ? (
+                    <div className="mt-4 rounded-xl border bg-card/70 p-4">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {mediaTypeBadge(selectedMedia.type)}
+                        <span className="font-medium">{selectedMedia.name}</span>
+                        <span className="font-mono text-xs text-muted-foreground">{selectedMedia.slug}</span>
+                      </div>
+                      <div className="mt-3">{renderMediaPreview(selectedMedia, 'large')}</div>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-xl border border-dashed bg-card/40 p-6 text-sm text-muted-foreground">
+                      Nenhuma midia selecionada. Para usar imagem, video, audio ou documento, escolha um item da biblioteca.
+                    </div>
+                  )}
+                </div>
 
-            <div className="rounded-xl border bg-secondary/20 p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-medium">Prévia (estilo WhatsApp)</div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => simulateDynamic.mutate(form.getValues('content') || '')}
-                    disabled={simulateDynamic.isPending}
-                  >
-                    {simulateDynamic.isPending ? <Loader2 className="animate-spin" /> : <Wand2 />}
-                    Simular conteúdo dinâmico
-                  </Button>
-                  {simulatedAudit ? (
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2">
+                    {variables.map((variable) => (
+                      <Button
+                        key={variable}
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          insertAtCursor(contentRef.current, variable, (next) =>
+                            form.setValue('content', next, { shouldDirty: true, shouldValidate: true }),
+                          )
+                        }
+                      >
+                        {variable}
+                      </Button>
+                    ))}
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
+                      variant="secondary"
                       onClick={() => {
-                        setSimulatedAudit(null)
+                        setGroupSearch('')
+                        setGroupPickerOpen(true)
                       }}
                     >
-                      Resetar
+                      <Layers /> Inserir grupo dinamico
                     </Button>
+                  </div>
+
+                  <Field label="Legenda / texto" error={form.formState.errors.content?.message}>
+                    <Textarea
+                      rows={9}
+                      {...contentRegister}
+                      ref={(element) => {
+                        contentRegister.ref(element)
+                        contentRef.current = element
+                      }}
+                      placeholder="Ex.: {{saudacao}} {{nome}}, tudo bem?"
+                    />
+                  </Field>
+                  <div className="text-xs text-muted-foreground">
+                    Se voce selecionar uma midia principal, este texto vira a legenda dela. Se deixar vazio, o template pode enviar so a midia.
+                  </div>
+                </div>
+
+                <Field label="Tags (separadas por virgula)">
+                  <Input {...form.register('tags')} placeholder="Ex.: onboarding, audio, imagem" />
+                </Field>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-xl border bg-secondary/20 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium">Previa</div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => simulateDynamic.mutate(form.getValues('content') || '')}
+                        disabled={simulateDynamic.isPending}
+                      >
+                        {simulateDynamic.isPending ? <Loader2 className="animate-spin" /> : <Wand2 />}
+                        Simular dinamico
+                      </Button>
+                      {simulatedAudit ? (
+                        <Button type="button" size="sm" variant="outline" onClick={() => setSimulatedAudit(null)}>
+                          Resetar
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 w-full max-w-[520px] rounded-2xl bg-black/40 p-4 text-sm text-foreground shadow-inner">
+                    {selectedMedia ? <div className="mb-3">{renderMediaPreview(selectedMedia, 'compact')}</div> : null}
+                    <div className="whitespace-pre-wrap leading-relaxed">
+                      {simulatedAudit?.renderedText ||
+                        contentValue ||
+                        (selectedMedia ? (
+                          <span className="text-muted-foreground">Template pronto para enviar a midia selecionada.</span>
+                        ) : (
+                          <span className="text-muted-foreground">Digite o conteudo para ver a previa.</span>
+                        ))}
+                    </div>
+                  </div>
+
+                  {(simulatedAudit ? simulatedAudit.warnings : validationWarnings).length ? (
+                    <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                      <div className="font-semibold text-destructive">Atencao</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                        {(simulatedAudit ? simulatedAudit.warnings : validationWarnings).map((warning, index) => (
+                          <li key={index}>{warning}</li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-xs text-muted-foreground">Os avisos nao bloqueiam o salvamento.</div>
+                    </div>
+                  ) : null}
+
+                  {simulatedAudit?.errors.length ? (
+                    <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
+                      <div className="font-semibold text-destructive">Erros</div>
+                      <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
+                        {simulatedAudit.errors.map((error, index) => (
+                          <li key={index}>{error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {simulatedAudit ? (
+                    <div className="mt-3 space-y-3">
+                      <div className="rounded-lg border bg-secondary/10 p-3">
+                        <div className="text-xs font-semibold text-muted-foreground">Texto renderizado</div>
+                        <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed">
+                          {simulatedAudit.renderedText || '(sem texto)'}
+                        </pre>
+                      </div>
+
+                      <div className="rounded-lg border bg-secondary/10 p-3">
+                        <div className="text-xs font-semibold text-muted-foreground">Grupos resolvidos</div>
+                        {simulatedAudit.dynamicGroups.length ? (
+                          <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
+                            {simulatedAudit.dynamicGroups.map((group) => (
+                              <li key={`${group.slug}-${group.itemId ?? 'none'}`} className="font-mono">
+                                {group.slug} {'->'} item {group.itemId ?? '—'} {'->'} {group.resolvedText ?? '—'}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="mt-2 text-xs text-muted-foreground">Nenhum grupo dinamico detectado.</div>
+                        )}
+                      </div>
+                    </div>
                   ) : null}
                 </div>
               </div>
-              <div className="mt-2 w-full max-w-[520px] rounded-2xl bg-black/40 p-4 text-sm text-foreground shadow-inner">
-                <div className="whitespace-pre-wrap leading-relaxed">
-                  {simulatedAudit?.renderedText ??
-                    (contentValue || (
-                      <span className="text-muted-foreground">Digite o conteúdo para ver a prévia.</span>
-                    ))}
-                </div>
-              </div>
-
-              {(simulatedAudit ? simulatedAudit.warnings : validationWarnings).length ? (
-                <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <div className="font-semibold text-destructive">Atenção</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                    {(simulatedAudit ? simulatedAudit.warnings : validationWarnings).map((w, idx) => (
-                      <li key={idx}>{w}</li>
-                    ))}
-                  </ul>
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Os avisos não bloqueiam o salvamento do template.
-                  </div>
-                </div>
-              ) : null}
-
-              {simulatedAudit?.errors?.length ? (
-                <div className="mt-3 rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm">
-                  <div className="font-semibold text-destructive">Erros</div>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-muted-foreground">
-                    {simulatedAudit.errors.map((w, idx) => (
-                      <li key={idx}>{w}</li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              {simulatedAudit ? (
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="rounded-lg border bg-secondary/10 p-3">
-                    <div className="text-xs font-semibold text-muted-foreground">Texto original</div>
-                    <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed">
-                      {simulatedAudit.templateOriginal}
-                    </pre>
-                  </div>
-                  <div className="rounded-lg border bg-secondary/10 p-3">
-                    <div className="text-xs font-semibold text-muted-foreground">Texto renderizado</div>
-                    <pre className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed">
-                      {simulatedAudit.renderedText}
-                    </pre>
-                  </div>
-
-                  <div className="rounded-lg border bg-secondary/10 p-3 md:col-span-2">
-                    <div className="text-xs font-semibold text-muted-foreground">Grupos resolvidos</div>
-                    {simulatedAudit.dynamicGroups.length ? (
-                      <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                        {simulatedAudit.dynamicGroups.map((g) => (
-                          <li key={g.slug} className="font-mono">
-                            {g.slug} → itemId {g.itemId ?? '—'} → {g.resolvedText ?? '—'}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <div className="mt-2 text-xs text-muted-foreground">Nenhum grupo dinâmico detectado.</div>
-                    )}
-                  </div>
-                </div>
-              ) : null}
             </div>
 
             <div className="sticky bottom-0 -mx-5 mt-4 border-t bg-card/95 px-5 pt-4 backdrop-blur supports-[backdrop-filter]:bg-card/80">
@@ -670,7 +797,7 @@ export function AdminTemplatesPage() {
                   Cancelar
                 </Button>
                 <Button type="submit" disabled={save.isPending}>
-                  {save.isPending ? 'Salvando…' : 'Salvar'}
+                  {save.isPending ? 'Salvando...' : 'Salvar'}
                 </Button>
               </div>
             </div>
@@ -678,11 +805,10 @@ export function AdminTemplatesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal: Inserir Grupo Dinâmico */}
       <Dialog open={groupPickerOpen} onOpenChange={setGroupPickerOpen}>
         <DialogContent
-          title="Inserir Grupo Dinâmico"
-          description="Selecione um grupo ativo para inserir a variável {{grupo:slug}} no conteúdo."
+          title="Inserir grupo dinamico"
+          description="Selecione um grupo ativo para inserir a variavel {{grupo:slug}} no texto."
           className="max-w-3xl"
         >
           <div className="space-y-4">
@@ -690,11 +816,16 @@ export function AdminTemplatesPage() {
               <div className="flex-1">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input value={groupSearch} onChange={(e) => setGroupSearch(e.target.value)} className="pl-9" placeholder="Buscar por nome ou slug…" />
+                  <Input
+                    value={groupSearch}
+                    onChange={(event) => setGroupSearch(event.target.value)}
+                    className="pl-9"
+                    placeholder="Buscar por nome ou slug..."
+                  />
                 </div>
               </div>
               <div className="text-sm text-muted-foreground">
-                {contentGroups.isPending ? 'Carregando…' : `${activeGroups.length} grupo(s) ativos`}
+                {contentGroups.isPending ? 'Carregando...' : `${activeGroups.length} grupo(s) ativos`}
               </div>
             </div>
 
@@ -706,8 +837,8 @@ export function AdminTemplatesPage() {
 
             {contentGroups.isPending ? (
               <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className="h-12 animate-pulse rounded-lg bg-secondary/30" />
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <div key={index} className="h-12 animate-pulse rounded-lg bg-secondary/30" />
                 ))}
               </div>
             ) : activeGroups.length ? (
@@ -718,26 +849,24 @@ export function AdminTemplatesPage() {
                       <TableHead>Grupo</TableHead>
                       <TableHead>Tipo</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Variável</TableHead>
-                      <TableHead className="text-right">Ação</TableHead>
+                      <TableHead>Variavel</TableHead>
+                      <TableHead className="text-right">Acao</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {activeGroups.map((g) => {
-                      const variable = `{{grupo:${g.slug}}}`
+                    {activeGroups.map((group) => {
+                      const variable = `{{grupo:${group.slug}}}`
                       return (
-                        <TableRow key={g.id}>
+                        <TableRow key={group.id}>
                           <TableCell>
-                            <div className="font-medium">{g.name}</div>
-                            <div className="text-xs text-muted-foreground font-mono">{g.slug}</div>
+                            <div className="font-medium">{group.name}</div>
+                            <div className="font-mono text-xs text-muted-foreground">{group.slug}</div>
                           </TableCell>
-                          <TableCell>{groupTypeBadge(g.type)}</TableCell>
-                          <TableCell>{groupStatusBadge(g.status)}</TableCell>
+                          <TableCell>{groupTypeBadge(group.type)}</TableCell>
+                          <TableCell>{groupStatusBadge(group.status)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <span className="font-mono text-xs rounded-md border bg-secondary/20 px-2 py-1">
-                                {variable}
-                              </span>
+                              <span className="rounded-md border bg-secondary/20 px-2 py-1 font-mono text-xs">{variable}</span>
                               <CopyVariableButton variable={variable} />
                             </div>
                           </TableCell>
@@ -745,8 +874,10 @@ export function AdminTemplatesPage() {
                             <Button
                               size="sm"
                               onClick={() => {
-                                insertAtCursor(contentRef.current, variable)
-                                toast({ title: 'Variável inserida', variant: 'success' })
+                                insertAtCursor(contentRef.current, variable, (next) =>
+                                  form.setValue('content', next, { shouldDirty: true, shouldValidate: true }),
+                                )
+                                toast({ title: 'Variavel inserida', variant: 'success' })
                                 setGroupPickerOpen(false)
                               }}
                             >
@@ -770,6 +901,160 @@ export function AdminTemplatesPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={mediaPickerOpen} onOpenChange={setMediaPickerOpen}>
+        <DialogContent
+          title="Escolher midia principal"
+          description="Selecione uma imagem, video, audio ou documento da biblioteca."
+          className="max-w-5xl"
+        >
+          <div className="space-y-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={mediaSearch}
+                    onChange={(event) => setMediaSearch(event.target.value)}
+                    className="pl-9"
+                    placeholder="Buscar por nome, slug ou tipo..."
+                  />
+                </div>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {mediaLibrary.isPending ? 'Carregando...' : `${mediaOptions.length} midia(s)`}
+              </div>
+            </div>
+
+            {mediaLibrary.isError ? (
+              <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+                {getErrorMessage(mediaLibrary.error)}
+              </div>
+            ) : null}
+
+            {mediaLibrary.isPending ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, index) => (
+                  <div key={index} className="h-28 animate-pulse rounded-xl bg-secondary/30" />
+                ))}
+              </div>
+            ) : mediaOptions.length ? (
+              <div className="grid max-h-[520px] gap-3 overflow-auto md:grid-cols-2">
+                {mediaOptions.map((media) => (
+                  <button
+                    key={media.id}
+                    type="button"
+                    onClick={() => {
+                      form.setValue('mediaId', media.id, { shouldDirty: true, shouldValidate: true })
+                      toast({ title: 'Midia selecionada', variant: 'success' })
+                      setMediaPickerOpen(false)
+                    }}
+                    className="rounded-xl border bg-card/70 p-4 text-left transition hover:border-primary/60 hover:bg-secondary/20"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-medium">{media.name}</div>
+                        <div className="font-mono text-xs text-muted-foreground">{media.slug}</div>
+                      </div>
+                      {mediaTypeBadge(media.type)}
+                    </div>
+                    <div className="mt-3">{renderMediaPreview(media, 'picker')}</div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-lg border bg-secondary/10 p-6 text-center">
+                <div className="text-sm font-semibold">Nenhuma midia encontrada</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Faça upload na biblioteca de midia antes de montar um template multimidia.
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+function insertAtCursor(
+  textarea: HTMLTextAreaElement | null,
+  value: string,
+  updateContent: (next: string) => void,
+) {
+  if (!textarea) return
+  const start = textarea.selectionStart ?? textarea.value.length
+  const end = textarea.selectionEnd ?? textarea.value.length
+  const next = textarea.value.slice(0, start) + value + textarea.value.slice(end)
+  updateContent(next)
+  requestAnimationFrame(() => {
+    textarea.focus()
+    textarea.setSelectionRange(start + value.length, start + value.length)
+  })
+}
+
+function findGroupSlugs(content: string) {
+  const regex = /\{\{grupo:([a-z0-9-_]+)\}\}/gi
+  const slugs = new Set<string>()
+  let match: RegExpExecArray | null
+  while ((match = regex.exec(content))) {
+    slugs.add(match[1].toLowerCase())
+  }
+  return [...slugs]
+}
+
+function renderResolvedItem(item: ContentGroupItem) {
+  if (item.type === 'TEXT') return item.textContent ?? ''
+  const name = item.media?.name ?? 'midia'
+  const slug = item.media?.slug ?? item.mediaId ?? '—'
+  const type = item.media?.type ?? item.type
+  return `[Midia dinamica: ${name} / ${slug} / ${type}]`
+}
+
+function renderMediaPreview(media: Pick<MediaAsset, 'name' | 'publicUrl' | 'type'>, size: 'compact' | 'picker' | 'large') {
+  const heightClass =
+    size === 'large' ? 'h-48' : size === 'picker' ? 'h-28' : 'h-32'
+
+  if (media.type === 'IMAGE' && media.publicUrl) {
+    return (
+      <img
+        src={media.publicUrl}
+        alt={media.name}
+        className={`${heightClass} w-full rounded-lg border object-cover`}
+      />
+    )
+  }
+
+  if (media.type === 'VIDEO' && media.publicUrl) {
+    return (
+      <video
+        src={media.publicUrl}
+        controls
+        className={`${heightClass} w-full rounded-lg border bg-black object-cover`}
+      />
+    )
+  }
+
+  if (media.type === 'AUDIO') {
+    return (
+      <div className="rounded-lg border bg-card/80 p-4">
+        <div className="mb-3 flex items-center gap-2 text-sm">
+          <FileAudio className="h-4 w-4" />
+          <span>{media.name}</span>
+        </div>
+        {media.publicUrl ? <audio src={media.publicUrl} controls className="w-full" /> : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`${heightClass} flex items-center justify-center rounded-lg border bg-card/80 px-4 text-sm text-muted-foreground`}>
+      <div className="flex items-center gap-2">
+        {media.type === 'IMAGE' ? <FileImage className="h-4 w-4" /> : null}
+        {media.type === 'VIDEO' ? <FileVideo className="h-4 w-4" /> : null}
+        <FileText className="h-4 w-4" />
+        <span>{media.name}</span>
+      </div>
     </div>
   )
 }
