@@ -5,7 +5,21 @@ import { useAuthStore } from '@/features/auth/auth.store'
 
 function getBaseUrl() {
   const fromEnv = import.meta.env.VITE_API_URL
-  return fromEnv || 'http://localhost:3000/api'
+  if (fromEnv) return fromEnv
+
+  if (typeof window !== 'undefined') {
+    const { protocol, hostname, port } = window.location
+
+    if (hostname === 'chipfire.automation.app.br') {
+      return 'https://chipfire-api.automation.app.br/api'
+    }
+
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return `${protocol}//${hostname}:${port === '5173' ? '3000' : port || '3000'}/api`
+    }
+  }
+
+  return 'https://chipfire-api.automation.app.br/api'
 }
 
 export const api = axios.create({
