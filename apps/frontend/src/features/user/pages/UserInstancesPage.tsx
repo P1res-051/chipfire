@@ -486,26 +486,37 @@ export function UserInstancesPage() {
                     {i.healthScore ?? 0}% · {i.healthLabel}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    {i.maturationEnabled ? (
-                      <div className="space-y-1">
-                        <Badge variant="success">Ligada</Badge>
-                        <div className="text-xs text-muted-foreground">
-                          Proximo envio em: {formatCountdown(i.maturationNextSendAt, nowTs)}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          Maturacao hoje: {i.maturationMessagesToday ?? 0}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {i.lastMaturationLog
-                            ? `${i.instanceName} -> ${i.lastMaturationLog.targetInstanceName} as ${formatDateTime(i.lastMaturationLog.occurredAt)}`
-                            : i.maturationLastQueueAt
-                              ? `Na fila desde: ${formatDateTime(i.maturationLastQueueAt)}`
-                              : 'Entrando na fila'}
-                        </div>
-                      </div>
-                    ) : (
-                      <Badge variant="outline">OFF</Badge>
-                    )}
+                    <div className="space-y-2">
+                      <Button
+                        size="sm"
+                        variant={i.maturationEnabled ? 'secondary' : 'outline'}
+                        className="h-7 px-3"
+                        title={i.maturationEnabled ? 'Pausar maturacao' : 'Ligar maturacao'}
+                        onClick={() =>
+                          toggleMaturation.mutate({ instance: i, enabled: !i.maturationEnabled })
+                        }
+                        disabled={toggleMaturation.isPending}
+                      >
+                        {i.maturationEnabled ? 'Ligada' : 'OFF'}
+                      </Button>
+                      {i.maturationEnabled ? (
+                        <>
+                          <div className="text-xs text-muted-foreground">
+                            Proximo envio em: {formatCountdown(i.maturationNextSendAt, nowTs)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Maturacao hoje: {i.maturationMessagesToday ?? 0}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {i.lastMaturationLog
+                              ? `${i.instanceName} -> ${i.lastMaturationLog.targetInstanceName} as ${formatDateTime(i.lastMaturationLog.occurredAt)}`
+                              : i.maturationLastQueueAt
+                                ? `Na fila desde: ${formatDateTime(i.maturationLastQueueAt)}`
+                                : 'Entrando na fila'}
+                          </div>
+                        </>
+                      ) : null}
+                    </div>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {i.maturationEnabled ? i.maturationCurrentTargetName ?? 'Definindo...' : '-'}
@@ -524,18 +535,6 @@ export function UserInstancesPage() {
                         disabled={!i.maturationEnabled || triggerMaturation.isPending}
                       >
                         Disparar agora
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant={i.maturationEnabled ? 'secondary' : 'outline'}
-                        className="h-8 w-8"
-                        title={i.maturationEnabled ? 'Pausar maturacao' : 'Ligar maturacao'}
-                        onClick={() =>
-                          toggleMaturation.mutate({ instance: i, enabled: !i.maturationEnabled })
-                        }
-                        disabled={toggleMaturation.isPending}
-                      >
-                        {i.maturationEnabled ? <RefreshCcw /> : <PlugZap />}
                       </Button>
                       <Button
                         size="icon"
