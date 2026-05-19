@@ -139,6 +139,8 @@ model WhatsAppInstance {
   maturationDailyLimit       Int       @default(24)
   maturationIntervalMinSeconds Int     @default(180)
   maturationIntervalMaxSeconds Int     @default(420)
+  maturationTargetMode       String    @default("INSTANCES")
+  maturationContactTag       String?
   maturationContentGroupSlugs String[] @default([])
   maturationNextSendAt  DateTime?
   maturationLastSentAt  DateTime?

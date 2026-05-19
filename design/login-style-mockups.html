@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChipFire - Login Style Mockups</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #090b0f;
+        --card: #11141b;
+        --muted: #91a0b2;
+        --text: #f5f7fa;
+        --line: rgba(255,255,255,.08);
+        --accent: #ff7a1a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: Inter, Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(255,122,26,.12), transparent 22%),
+          radial-gradient(circle at bottom right, rgba(255,122,26,.06), transparent 18%),
+          #090b0f;
+        color: var(--text);
+      }
+      .page {
+        padding: 32px;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 28px;
+      }
+      .lead {
+        margin: 0 0 28px;
+        color: #a7b2c2;
+        font-size: 15px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(320px, 1fr));
+        gap: 24px;
+      }
+      .mock {
+        min-height: 520px;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 28px;
+        overflow: hidden;
+        position: relative;
+        box-shadow: 0 28px 60px rgba(0,0,0,.35);
+      }
+      .mock-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: 22px 24px 0;
+      }
+      .mock-header h2 {
+        margin: 0;
+        font-size: 20px;
+      }
+      .tag {
+        font-size: 12px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(255,255,255,.16);
+        color: #cfd6df;
+      }
+      .shell {
+        margin: 18px 24px 24px;
+        border-radius: 24px;
+        min-height: 430px;
+        padding: 28px;
+        border: 1px solid rgba(255,255,255,.08);
+      }
+      .panel-title {
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: .08em;
+        color: #7d8898;
+        margin-bottom: 16px;
+      }
+      .brand {
+        color: var(--accent);
+        font-size: 30px;
+        font-weight: 700;
+        margin-bottom: 12px;
+      }
+      .headline {
+        font-size: 28px;
+        font-weight: 700;
+        margin-bottom: 10px;
+      }
+      .sub {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.5;
+        margin-bottom: 20px;
+      }
+      .field {
+        height: 50px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,.1);
+        display: flex;
+        align-items: center;
+        padding: 0 16px;
+        color: #7d8898;
+        margin-bottom: 14px;
+      }
+      .button {
+        height: 48px;
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+      }
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .stat {
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        padding: 14px;
+      }
+      .stat small {
+        display: block;
+        color: #788596;
+        margin-bottom: 6px;
+      }
+      .stat strong {
+        font-size: 24px;
+      }
+
+      .quiet { background: linear-gradient(135deg, #0f1218, #171c25); }
+      .quiet .shell { background: rgba(9,12,17,.74); }
+      .quiet .button { background: var(--accent); color: #101318; }
+
+      .glass {
+        background:
+          radial-gradient(circle at top right, rgba(255,122,26,.22), transparent 24%),
+          linear-gradient(135deg, #170d07, #26160c);
+      }
+      .glass .shell {
+        background: rgba(18,21,28,.72);
+        backdrop-filter: blur(12px);
+        border-color: rgba(255,255,255,.18);
+      }
+      .glass .button { background: linear-gradient(135deg, #ff7a1a, #ff9b4b); color: #190f07; }
+
+      .split { background: linear-gradient(135deg, #0d131c, #121c28); }
+      .split .shell {
+        background: transparent;
+        border: none;
+        display: grid;
+        grid-template-columns: 0.95fr 1.05fr;
+        gap: 18px;
+        padding: 0;
+      }
+      .split .left, .split .right {
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 24px;
+        background: rgba(14,18,24,.76);
+        padding: 26px;
+      }
+      .split .button { background: #ff7a1a; color: #11161d; }
+
+      .light {
+        color-scheme: light;
+        background: linear-gradient(135deg, #f5f7fb, #e8edf5);
+      }
+      .light .mock-header h2 { color: #172130; }
+      .light .tag { color: #536174; border-color: rgba(0,0,0,.12); }
+      .light .shell {
+        background: rgba(255,255,255,.92);
+        border-color: rgba(16,22,34,.08);
+      }
+      .light .panel-title { color: #647287; }
+      .light .headline { color: #172130; }
+      .light .sub { color: #637185; }
+      .light .field {
+        background: #f6f8fc;
+        border-color: #dbe2eb;
+        color: #7a8697;
+      }
+      .light .button { background: #182332; color: white; }
+
+      @media (max-width: 980px) {
+        .grid { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>4 caminhos visuais para o login</h1>
+      <p class="lead">Mesma ideia de produto, 4 personalidades diferentes para a primeira tela do ChipFire.</p>
+
+      <div class="grid">
+        <section class="mock quiet">
+          <div class="mock-header">
+            <h2>1. Quiet Ops Dark</h2>
+            <span class="tag">mais sóbrio</span>
+          </div>
+          <div class="shell">
+            <div class="panel-title">Acesso</div>
+            <div class="brand">ChipFire</div>
+            <div class="headline">Entrar no painel</div>
+            <div class="sub">Visual enxuto, calmo e operacional. Menos brilho, mais foco e sensação de estabilidade.</div>
+            <div class="field">E-mail</div>
+            <div class="field">Senha</div>
+            <div class="button">Entrar</div>
+          </div>
+        </section>
+
+        <section class="mock glass">
+          <div class="mock-header">
+            <h2>2. Glass Ember</h2>
+            <span class="tag">mais premium</span>
+          </div>
+          <div class="shell">
+            <div class="panel-title">Login</div>
+            <div class="brand">ChipFire</div>
+            <div class="headline">Bem-vindo de volta</div>
+            <div class="sub">Mantém a base escura, mas traz profundidade com vidro, brilho quente e um acabamento mais sofisticado.</div>
+            <div class="field">E-mail corporativo</div>
+            <div class="field">Senha</div>
+            <div class="button">Acessar</div>
+          </div>
+        </section>
+
+        <section class="mock split">
+          <div class="mock-header">
+            <h2>3. Split Command Center</h2>
+            <span class="tag">mais produto</span>
+          </div>
+          <div class="shell">
+            <div class="left">
+              <div class="panel-title">Plataforma</div>
+              <div class="brand">ChipFire</div>
+              <div class="headline">Controle de acesso</div>
+              <div class="sub">Mostra desde o login que é uma ferramenta de operação, não uma landing page.</div>
+              <div class="stats">
+                <div class="stat">
+                  <small>Instâncias conectadas</small>
+                  <strong>24</strong>
+                </div>
+                <div class="stat">
+                  <small>Fila ativa</small>
+                  <strong>312</strong>
+                </div>
+              </div>
+            </div>
+            <div class="right">
+              <div class="panel-title">Entrar</div>
+              <div class="field">E-mail</div>
+              <div class="field">Senha</div>
+              <div class="button">Continuar</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="mock light">
+          <div class="mock-header">
+            <h2>4. Light Enterprise</h2>
+            <span class="tag">mais corporativo</span>
+          </div>
+          <div class="shell">
+            <div class="panel-title">Acesso seguro</div>
+            <div class="brand">ChipFire</div>
+            <div class="headline">Acesse sua operação</div>
+            <div class="sub">Mais claro e familiar para equipes maiores, com clima de software corporativo e menos “hacker dark”.</div>
+            <div class="field">E-mail</div>
+            <div class="field">Senha</div>
+            <div class="button">Entrar no sistema</div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </body>
+</html>

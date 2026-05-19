@@ -7,6 +7,8 @@ export const updateInstanceMaturationConfigSchema = z
     dailyLimit: z.coerce.number().int().min(1).max(500),
     intervalMinSeconds: z.coerce.number().int().min(15).max(3600),
     intervalMaxSeconds: z.coerce.number().int().min(15).max(3600),
+    targetMode: z.enum(['INSTANCES', 'CONTACTS']).default('INSTANCES'),
+    contactTag: z.string().trim().max(80).optional().nullable(),
     contentGroupSlugs: z.array(z.string().trim().min(1).max(60)).max(20).default([]),
   })
   .refine((value) => value.intervalMaxSeconds >= value.intervalMinSeconds, {

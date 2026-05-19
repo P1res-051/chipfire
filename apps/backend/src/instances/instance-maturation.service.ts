@@ -15,9 +15,11 @@ const DEFAULT_SEND_DELAY_BETWEEN_MESSAGES_MS = 1_200
 
 type MaturationJob = {
   instanceId: string
-  targetInstanceId?: string | null
+  targetId?: string | null
   triggerNow?: boolean
 }
+
+type MaturationTargetMode = 'INSTANCES' | 'CONTACTS'
 
 type MaturationTemplate = {
   id: string | null
@@ -62,7 +64,16 @@ type InstanceForMaturation = {
   maturationDailyLimit: number
   maturationIntervalMinSeconds: number
   maturationIntervalMaxSeconds: number
+  maturationTargetMode: string
+  maturationContactTag: string | null
   maturationContentGroupSlugs: string[]
+}
+
+type MaturationTarget = {
+  kind: 'INSTANCE' | 'CONTACT'
+  id: string | null
+  name: string
+  phoneNumber: string
 }
 
 @Injectable()
@@ -125,6 +136,8 @@ export class InstanceMaturationService implements OnModuleInit {
         maturationDailyLimit: dto.dailyLimit,
         maturationIntervalMinSeconds: dto.intervalMinSeconds,
         maturationIntervalMaxSeconds: dto.intervalMaxSeconds,
+        maturationTargetMode: dto.targetMode,
+        maturationContactTag: dto.contactTag?.trim() || null,
         maturationContentGroupSlugs: this.normalizeSlugs(dto.contentGroupSlugs),
       },
     })
@@ -151,6 +164,8 @@ export class InstanceMaturationService implements OnModuleInit {
         maturationEnabled: true,
         maturationIntervalMinSeconds: true,
         maturationIntervalMaxSeconds: true,
+        maturationTargetMode: true,
+        maturationContactTag: true,
       },
     })
 
@@ -170,14 +185,14 @@ export class InstanceMaturationService implements OnModuleInit {
           maturationLastQueueAt: new Date(),
           maturationNextSendAt: nextSendAt,
           maturationCurrentTargetId: target?.id ?? null,
-          maturationCurrentTargetName: target?.instanceName ?? null,
+          maturationCurrentTargetName: target?.name ?? null,
         },
       })
       .catch(() => undefined)
 
     await this.maturationQueue.add(
       'instance-maturation',
-      { instanceId, targetInstanceId: target?.id ?? null, triggerNow },
+      { instanceId, targetId: target?.id ?? null, triggerNow },
       {
         delay,
         removeOnComplete: true,
@@ -200,6 +215,8 @@ export class InstanceMaturationService implements OnModuleInit {
         maturationDailyLimit: true,
         maturationIntervalMinSeconds: true,
         maturationIntervalMaxSeconds: true,
+        maturationTargetMode: true,
+        maturationContactTag: true,
         maturationContentGroupSlugs: true,
       },
     })
@@ -208,25 +225,10 @@ export class InstanceMaturationService implements OnModuleInit {
       return
     }
 
-    const target = jobTargetId
-      ? await this.prisma.whatsAppInstance.findFirst({
-          where: {
-            id: jobTargetId,
-            userId: origin.userId,
-            maturationEnabled: true,
-            status: InstanceStatus.CONNECTED,
-            phoneNumber: { not: null },
-          },
-          select: {
-            id: true,
-            instanceName: true,
-            phoneNumber: true,
-          },
-        })
-      : await this.pickTarget(origin)
+    const target = await this.resolveTarget(origin, jobTargetId)
 
-    if (origin.status !== InstanceStatus.CONNECTED || !origin.phoneNumber || !target || !target.phoneNumber) {
-      this.logger.debug(`[maturation] instance=${origin.instanceName} aguardando pares aptos`)
+    if (origin.status !== InstanceStatus.CONNECTED || !origin.phoneNumber || !target?.phoneNumber) {
+      this.logger.debug(`[maturation] instance=${origin.instanceName} aguardando destino apto`)
       await this.enqueue(origin.id)
       return
     }
@@ -326,27 +328,27 @@ export class InstanceMaturationService implements OnModuleInit {
         maturationLastSentAt: completedAt,
         lastActivityAt: completedAt,
         maturationCurrentTargetId: target.id,
-        maturationCurrentTargetName: target.instanceName,
+        maturationCurrentTargetName: target.name,
         maturationNextSendAt: null,
       },
     })
 
     this.logger.log(
-      `[maturation] ${origin.instanceName} -> ${target.instanceName} (${target.phoneNumber}) x${batchSize}`,
-    )
+        `[maturation] ${origin.instanceName} -> ${target.name} (${target.phoneNumber}) x${batchSize}`,
+      )
 
     await this.enqueue(origin.id)
   }
 
   private async buildOutgoingMessage(
     origin: InstanceForMaturation,
-    target: { id: string; instanceName: string; phoneNumber: string },
+    target: MaturationTarget,
   ): Promise<OutgoingMaturationMessage> {
     const directDynamicPayload = await this.pickDirectDynamicPayload(
       origin.userId,
       origin.maturationContentGroupSlugs,
       origin.instanceName,
-      target.instanceName,
+      target.name,
     )
 
     const template = await this.pickTemplate(origin.userId)
@@ -410,18 +412,18 @@ export class InstanceMaturationService implements OnModuleInit {
   private async resolveTemplateForInstanceContext(
     template: MaturationTemplate,
     origin: InstanceForMaturation,
-    target: { instanceName: string; phoneNumber: string },
+    target: { name: string; phoneNumber: string },
   ) {
-    const renderedBase = this.renderTemplate(template.content, origin.instanceName, target.instanceName)
+    const renderedBase = this.renderTemplate(template.content, origin.instanceName, target.name)
 
     if (!template.ownerUserId) {
       return { text: renderedBase, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string } }
     }
 
     const fakeContact = {
-      id: `maturation-${target.instanceName}`,
+      id: `maturation-${target.name}`,
       userId: template.ownerUserId,
-      name: target.instanceName,
+      name: target.name,
       phone: target.phoneNumber,
       tag: 'maturation',
       optIn: true,
@@ -453,7 +455,7 @@ export class InstanceMaturationService implements OnModuleInit {
 
     if (!text && !directTemplateMedia && resolved.dynamicMedia.length === 0) {
       text = this.buildFallbackTemplate().content
-      text = this.renderTemplate(text, origin.instanceName, target.instanceName)
+      text = this.renderTemplate(text, origin.instanceName, target.name)
     }
 
     const firstMedia = resolved.dynamicMedia[0]
@@ -539,7 +541,17 @@ export class InstanceMaturationService implements OnModuleInit {
     return null
   }
 
-  private async pickTarget(origin: { id: string; userId: string }) {
+  private async pickTarget(origin: {
+    id: string
+    userId: string
+    phoneNumber?: string | null
+    maturationTargetMode: string
+    maturationContactTag?: string | null
+  }): Promise<MaturationTarget | null> {
+    if (this.normalizeTargetMode(origin.maturationTargetMode) === 'CONTACTS') {
+      return this.pickContactTarget(origin)
+    }
+
     const eligibleTargets = await this.prisma.whatsAppInstance.findMany({
       where: {
         userId: origin.userId,
@@ -558,7 +570,120 @@ export class InstanceMaturationService implements OnModuleInit {
 
     if (eligibleTargets.length === 0) return null
 
-    return eligibleTargets[Math.floor(Math.random() * Math.min(eligibleTargets.length, 3))] ?? eligibleTargets[0]
+    const instance =
+      eligibleTargets[Math.floor(Math.random() * Math.min(eligibleTargets.length, 3))] ?? eligibleTargets[0]
+
+    return instance
+      ? {
+          kind: 'INSTANCE',
+          id: instance.id,
+          name: instance.instanceName,
+          phoneNumber: instance.phoneNumber ?? '',
+        }
+      : null
+  }
+
+  private async pickContactTarget(origin: {
+    id: string
+    userId: string
+    phoneNumber?: string | null
+    maturationContactTag?: string | null
+  }): Promise<MaturationTarget | null> {
+    const recentLogs = await this.prisma.instanceMaturationLog.findMany({
+      where: {
+        originInstanceId: origin.id,
+        targetPhoneNumber: { not: null },
+      },
+      orderBy: { occurredAt: 'desc' },
+      take: 20,
+      select: { targetPhoneNumber: true },
+    })
+
+    const recentPhones = new Set(recentLogs.map((log) => log.targetPhoneNumber).filter(Boolean))
+    const baseWhere = {
+      userId: origin.userId,
+      optIn: true,
+      status: ContactStatus.ACTIVE,
+      phone: { not: origin.phoneNumber ?? undefined },
+      tag: origin.maturationContactTag ?? undefined,
+    }
+
+    const contacts = await this.prisma.contact.findMany({
+      where: baseWhere,
+      orderBy: [{ updatedAt: 'asc' }, { createdAt: 'asc' }],
+      take: 300,
+      select: { id: true, name: true, phone: true },
+    })
+
+    if (contacts.length === 0) return null
+
+    const freshPool = contacts.filter((contact) => !recentPhones.has(contact.phone))
+    const pool = freshPool.length > 0 ? freshPool : contacts
+    const contact = pool[Math.floor(Math.random() * Math.min(pool.length, 12))] ?? pool[0]
+
+    return contact
+      ? {
+          kind: 'CONTACT',
+          id: contact.id,
+          name: contact.name,
+          phoneNumber: contact.phone,
+        }
+      : null
+  }
+
+  private async resolveTarget(
+    origin: InstanceForMaturation,
+    targetId?: string | null,
+  ): Promise<MaturationTarget | null> {
+    if (!targetId) {
+      return this.pickTarget(origin)
+    }
+
+    if (this.normalizeTargetMode(origin.maturationTargetMode) === 'CONTACTS') {
+      const contact = await this.prisma.contact.findFirst({
+        where: {
+          id: targetId,
+          userId: origin.userId,
+          optIn: true,
+          status: ContactStatus.ACTIVE,
+          tag: origin.maturationContactTag ?? undefined,
+        },
+        select: { id: true, name: true, phone: true },
+      })
+
+      return contact
+        ? {
+            kind: 'CONTACT',
+            id: contact.id,
+            name: contact.name,
+            phoneNumber: contact.phone,
+          }
+        : this.pickTarget(origin)
+    }
+
+    const instance = await this.prisma.whatsAppInstance.findFirst({
+      where: {
+        id: targetId,
+        userId: origin.userId,
+        maturationEnabled: true,
+        status: InstanceStatus.CONNECTED,
+        phoneNumber: { not: null },
+      },
+      select: {
+        id: true,
+        instanceName: true,
+        phoneNumber: true,
+      },
+    })
+
+    return instance
+      ? {
+          kind: 'INSTANCE',
+          id: instance.id,
+          name: instance.instanceName,
+          phoneNumber: instance.phoneNumber ?? '',
+        }
+      : this.pickTarget(origin)
   }
 
   private async pickTemplate(userId: string): Promise<MaturationTemplate> {
@@ -608,7 +733,7 @@ export class InstanceMaturationService implements OnModuleInit {
 
   private async createLog(params: {
     origin: { id: string }
-    target: { id: string; instanceName: string; phoneNumber: string | null }
+    target: { id?: string | null; name: string; phoneNumber: string | null }
     text: string
     templateId?: string | null
     templateName?: string | null
@@ -621,8 +746,8 @@ export class InstanceMaturationService implements OnModuleInit {
     await this.prisma.instanceMaturationLog.create({
       data: {
         originInstanceId: params.origin.id,
-        targetInstanceId: params.target.id,
-        targetInstanceName: params.target.instanceName,
+        targetInstanceId: params.target.id ?? null,
+        targetInstanceName: params.target.name,
         targetPhoneNumber: params.target.phoneNumber,
         templateId: params.templateId ?? null,
         templateName: params.templateName ?? null,
@@ -722,6 +847,10 @@ export class InstanceMaturationService implements OnModuleInit {
       default:
         return MessageType.TEXT
     }
+  }
+
+  private normalizeTargetMode(mode: string | null | undefined): MaturationTargetMode {
+    return mode === 'CONTACTS' ? 'CONTACTS' : 'INSTANCES'
   }
 
   private mapMediaType(type: MessageType): 'image' | 'video' | 'audio' | 'document' {

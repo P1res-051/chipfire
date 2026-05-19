@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
@@ -20,6 +21,7 @@ import { getErrorMessage } from '@/lib/http'
 
 type InstanceStatus = 'WAITING_QR' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'PAUSED'
 type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT'
+type MaturationTargetMode = 'INSTANCES' | 'CONTACTS'
 
 type Instance = {
   id: string
@@ -31,6 +33,8 @@ type Instance = {
   maturationDailyLimit: number
   maturationIntervalMinSeconds: number
   maturationIntervalMaxSeconds: number
+  maturationTargetMode: MaturationTargetMode
+  maturationContactTag: string | null
   maturationContentGroupSlugs: string[]
   maturationNextSendAt: string | null
   maturationLastSentAt: string | null
@@ -67,6 +71,8 @@ const maturationConfigSchema = z
     dailyLimit: z.coerce.number().int().min(1).max(500),
     intervalMinSeconds: z.coerce.number().int().min(15).max(3600),
     intervalMaxSeconds: z.coerce.number().int().min(15).max(3600),
+    targetMode: z.enum(['INSTANCES', 'CONTACTS']).default('INSTANCES'),
+    contactTag: z.string().default(''),
     contentGroupSlugsText: z.string().default(''),
   })
   .refine((value) => value.intervalMaxSeconds >= value.intervalMinSeconds, {
@@ -125,6 +131,21 @@ export function UserInstancesPage() {
     queryFn: async () => {
       const { data } = await api.get('/instances')
       return data as Instance[]
+    },
+  })
+
+  const contactTags = useQuery({
+    queryKey: ['user', 'contacts', 'tags-for-maturation'],
+    queryFn: async () => {
+      const { data } = await api.get('/contacts')
+      const contacts = data as Array<{ tag?: string | null }>
+      return Array.from(
+        new Set(
+          contacts
+            .map((contact) => (contact.tag ?? '').trim())
+            .filter(Boolean),
+        ),
+      ).sort((left, right) => left.localeCompare(right))
     },
   })
 
@@ -217,6 +238,8 @@ export function UserInstancesPage() {
       dailyLimit: 24,
       intervalMinSeconds: 180,
       intervalMaxSeconds: 420,
+      targetMode: 'INSTANCES',
+      contactTag: '',
       contentGroupSlugsText: '',
     },
   })
@@ -388,6 +411,8 @@ export function UserInstancesPage() {
         dailyLimit: values.dailyLimit,
         intervalMinSeconds: values.intervalMinSeconds,
         intervalMaxSeconds: values.intervalMaxSeconds,
+        targetMode: values.targetMode,
+        contactTag: values.contactTag.trim() || null,
         contentGroupSlugs,
       })
       return data as Instance
@@ -464,6 +489,8 @@ export function UserInstancesPage() {
       dailyLimit: configInstance.maturationDailyLimit ?? 24,
       intervalMinSeconds: configInstance.maturationIntervalMinSeconds ?? 180,
       intervalMaxSeconds: configInstance.maturationIntervalMaxSeconds ?? 420,
+      targetMode: configInstance.maturationTargetMode ?? 'INSTANCES',
+      contactTag: configInstance.maturationContactTag ?? '',
       contentGroupSlugsText: (configInstance.maturationContentGroupSlugs ?? []).join('\n'),
     })
   }, [configForm, configInstance, configOpen])
@@ -609,6 +636,12 @@ export function UserInstancesPage() {
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Intervalo: {i.maturationIntervalMinSeconds}s - {i.maturationIntervalMaxSeconds}s
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Modo: {i.maturationTargetMode === 'CONTACTS' ? 'contatos importados' : 'instancias'}
+                            {i.maturationTargetMode === 'CONTACTS' && i.maturationContactTag
+                              ? ` · tag: ${i.maturationContactTag}`
+                              : ''}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             Grupos: {i.maturationContentGroupSlugs?.length ? i.maturationContentGroupSlugs.join(', ') : 'template/admin/fallback'}
@@ -858,6 +891,29 @@ export function UserInstancesPage() {
                     {configForm.formState.errors.intervalMaxSeconds.message}
                   </p>
                 ) : null}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Destino da maturacao</label>
+                <Select {...configForm.register('targetMode')}>
+                  <option value="INSTANCES">Instancias conectadas</option>
+                  <option value="CONTACTS">Contatos importados</option>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Tag de contatos (opcional)</label>
+                <Input
+                  list="maturation-contact-tags"
+                  placeholder="Ex.: bot-fixos"
+                  {...configForm.register('contactTag')}
+                />
+                <datalist id="maturation-contact-tags">
+                  {(contactTags.data ?? []).map((tag) => (
+                    <option key={tag} value={tag} />
+                  ))}
+                </datalist>
+                <p className="text-xs text-muted-foreground">
+                  Se ficar vazio, a fila usa todos os contatos ativos com opt-in desse login.
+                </p>
               </div>
             </div>
 
