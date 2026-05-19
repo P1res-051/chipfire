@@ -259,9 +259,27 @@ export class InstanceMaturationService implements OnModuleInit {
       select: { id: true, name: true, content: true },
     })
 
-    if (templates.length === 0) return this.buildFallbackTemplate()
+    if (templates.length > 0) {
+      return templates[Math.floor(Math.random() * templates.length)] ?? templates[0]
+    }
 
-    return templates[Math.floor(Math.random() * templates.length)] ?? templates[0]
+    const adminTemplates = await this.prisma.messageTemplate.findMany({
+      where: { user: { role: UserRole.ADMIN } },
+      orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+      select: { id: true, name: true, content: true },
+      take: 20,
+    })
+
+    if (adminTemplates.length > 0) {
+      const template =
+        adminTemplates[Math.floor(Math.random() * adminTemplates.length)] ?? adminTemplates[0]
+      return {
+        ...template,
+        name: `${template.name} (admin)`,
+      }
+    }
+
+    return this.buildFallbackTemplate()
   }
 
   private buildFallbackTemplate(): MaturationTemplate {
