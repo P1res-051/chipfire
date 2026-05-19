@@ -17,6 +17,13 @@ type MaturationJob = {
   triggerNow?: boolean
 }
 
+type MaturationTemplate = {
+  id: string | null
+  name: string
+  content: string
+  isFallback?: boolean
+}
+
 @Injectable()
 export class InstanceMaturationService implements OnModuleInit {
   private readonly logger = new Logger(InstanceMaturationService.name)
@@ -252,11 +259,19 @@ export class InstanceMaturationService implements OnModuleInit {
       select: { id: true, name: true, content: true },
     })
 
-    if (templates.length === 0) {
-      throw new NotFoundException('Nenhum template encontrado para usar na maturacao')
-    }
+    if (templates.length === 0) return this.buildFallbackTemplate()
 
     return templates[Math.floor(Math.random() * templates.length)] ?? templates[0]
+  }
+
+  private buildFallbackTemplate(): MaturationTemplate {
+    return {
+      id: null,
+      name: 'Fallback automatico',
+      content:
+        'Ola! Aqui e {{instancia_origem}} falando com {{instancia_destino}} para aquecer a instancia.',
+      isFallback: true,
+    }
   }
 
   private renderTemplate(content: string, originName: string, targetName: string) {

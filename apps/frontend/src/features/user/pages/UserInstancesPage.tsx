@@ -509,7 +509,7 @@ export function UserInstancesPage() {
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {i.lastMaturationLog
-                              ? `${i.instanceName} -> ${i.lastMaturationLog.targetInstanceName} as ${formatDateTime(i.lastMaturationLog.occurredAt)}`
+                              ? `${i.instanceName} -> ${i.lastMaturationLog.targetInstanceName} as ${formatDateTime(i.lastMaturationLog.occurredAt)}${i.lastMaturationLog.templateName ? ` · ${i.lastMaturationLog.templateName}` : ''}${i.lastMaturationLog.status !== 'SENT' && i.lastMaturationLog.errorMessage ? ` · ${i.lastMaturationLog.errorMessage}` : ''}`
                               : i.maturationLastQueueAt
                                 ? `Na fila desde: ${formatDateTime(i.maturationLastQueueAt)}`
                                 : 'Entrando na fila'}
