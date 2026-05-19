@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { PlugZap, Plus, QrCode, RefreshCcw, Trash2, Unplug } from 'lucide-react'
+import { PlugZap, Plus, QrCode, RefreshCcw, Settings2, Trash2, Unplug } from 'lucide-react'
 import * as React from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -12,12 +12,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ui/toast'
 import { api } from '@/lib/api'
 import { formatDateTime } from '@/lib/format'
 import { getErrorMessage } from '@/lib/http'
 
 type InstanceStatus = 'WAITING_QR' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'PAUSED'
+type MessageType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT'
 
 type Instance = {
   id: string
@@ -25,6 +27,11 @@ type Instance = {
   phoneNumber: string | null
   status: InstanceStatus
   maturationEnabled: boolean
+  maturationMessagesPerCycle: number
+  maturationDailyLimit: number
+  maturationIntervalMinSeconds: number
+  maturationIntervalMaxSeconds: number
+  maturationContentGroupSlugs: string[]
   maturationNextSendAt: string | null
   maturationLastSentAt: string | null
   maturationLastQueueAt: string | null
@@ -41,6 +48,9 @@ type Instance = {
     templateName: string | null
     occurredAt: string
     status: string
+    messageType: MessageType
+    contentGroupSlug: string | null
+    text: string
     errorMessage: string | null
   } | null
   createdAt: string
@@ -51,7 +61,22 @@ const createSchema = z.object({
   phoneNumber: z.string().optional(),
 })
 
+const maturationConfigSchema = z
+  .object({
+    messagesPerCycle: z.coerce.number().int().min(1).max(10),
+    dailyLimit: z.coerce.number().int().min(1).max(500),
+    intervalMinSeconds: z.coerce.number().int().min(15).max(3600),
+    intervalMaxSeconds: z.coerce.number().int().min(15).max(3600),
+    contentGroupSlugsText: z.string().default(''),
+  })
+  .refine((value) => value.intervalMaxSeconds >= value.intervalMinSeconds, {
+    message: 'O intervalo maximo precisa ser maior ou igual ao minimo.',
+    path: ['intervalMaxSeconds'],
+  })
+
 type CreateValues = z.infer<typeof createSchema>
+type MaturationConfigFormValues = z.input<typeof maturationConfigSchema>
+type MaturationConfigValues = z.output<typeof maturationConfigSchema>
 
 function statusBadge(status: InstanceStatus) {
   switch (status) {
@@ -78,6 +103,17 @@ function formatCountdown(target: string | null, now: number) {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
+}
+
+function summarizeLastLog(instance: Instance) {
+  const log = instance.lastMaturationLog
+  if (!log) {
+    return instance.maturationLastQueueAt
+      ? `Na fila desde: ${formatDateTime(instance.maturationLastQueueAt)}`
+      : 'Entrando na fila'
+  }
+
+  return `${instance.instanceName} -> ${log.targetInstanceName} as ${formatDateTime(log.occurredAt)}${log.templateName ? ` · ${log.templateName}` : ''}${log.contentGroupSlug ? ` · grupo:${log.contentGroupSlug}` : ''}${log.messageType !== 'TEXT' ? ` · ${log.messageType}` : ''}${log.status !== 'SENT' && log.errorMessage ? ` · ${log.errorMessage}` : ''}`
 }
 
 export function UserInstancesPage() {
@@ -112,6 +148,8 @@ export function UserInstancesPage() {
   const [qrError, setQrError] = React.useState<string | null>(null)
   const [qrImageSrc, setQrImageSrc] = React.useState<string | null>(null)
   const [qrInstanceId, setQrInstanceId] = React.useState<string | null>(null)
+  const [configOpen, setConfigOpen] = React.useState(false)
+  const [configInstance, setConfigInstance] = React.useState<Instance | null>(null)
   const [nowTs, setNowTs] = React.useState(() => Date.now())
 
   const closeQr = React.useCallback(() => {
@@ -170,6 +208,17 @@ export function UserInstancesPage() {
   const createForm = useForm<CreateValues>({
     resolver: zodResolver(createSchema),
     defaultValues: { instanceName: '', phoneNumber: '' },
+  })
+
+  const configForm = useForm<MaturationConfigFormValues, unknown, MaturationConfigValues>({
+    resolver: zodResolver(maturationConfigSchema),
+    defaultValues: {
+      messagesPerCycle: 1,
+      dailyLimit: 24,
+      intervalMinSeconds: 180,
+      intervalMaxSeconds: 420,
+      contentGroupSlugsText: '',
+    },
   })
 
   const createInstance = useMutation({
@@ -312,7 +361,7 @@ export function UserInstancesPage() {
     onSuccess: async () => {
       toast({
         title: 'Disparo enfileirado',
-        description: 'A mensagem de maturação foi colocada para envio imediato.',
+        description: 'A mensagem de maturacao foi colocada para envio imediato.',
         variant: 'success',
       })
       await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
@@ -320,6 +369,42 @@ export function UserInstancesPage() {
     onError: (e) =>
       toast({
         title: 'Falha ao disparar agora',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
+  })
+
+  const saveMaturationConfig = useMutation({
+    mutationFn: async (values: MaturationConfigValues) => {
+      if (!configInstance) throw new Error('Selecione uma instancia para configurar')
+
+      const contentGroupSlugs = values.contentGroupSlugsText
+        .split(/[\n,;]/)
+        .map((item) => item.trim().toLowerCase())
+        .filter(Boolean)
+
+      const { data } = await api.put(`/instances/${configInstance.id}/maturation/config`, {
+        messagesPerCycle: values.messagesPerCycle,
+        dailyLimit: values.dailyLimit,
+        intervalMinSeconds: values.intervalMinSeconds,
+        intervalMaxSeconds: values.intervalMaxSeconds,
+        contentGroupSlugs,
+      })
+      return data as Instance
+    },
+    onSuccess: async () => {
+      toast({
+        title: 'Configuracao salva',
+        description: 'A maturacao vai usar o novo ritmo e os grupos dinamicos configurados.',
+        variant: 'success',
+      })
+      setConfigOpen(false)
+      setConfigInstance(null)
+      await qc.invalidateQueries({ queryKey: ['user', 'instances'] })
+    },
+    onError: (e) =>
+      toast({
+        title: 'Falha ao salvar configuracao',
         description: getErrorMessage(e),
         variant: 'destructive',
       }),
@@ -370,6 +455,18 @@ export function UserInstancesPage() {
 
     return () => window.clearInterval(timer)
   }, [instances.data])
+
+  React.useEffect(() => {
+    if (!configOpen || !configInstance) return
+
+    configForm.reset({
+      messagesPerCycle: configInstance.maturationMessagesPerCycle ?? 1,
+      dailyLimit: configInstance.maturationDailyLimit ?? 24,
+      intervalMinSeconds: configInstance.maturationIntervalMinSeconds ?? 180,
+      intervalMaxSeconds: configInstance.maturationIntervalMaxSeconds ?? 420,
+      contentGroupSlugsText: (configInstance.maturationContentGroupSlugs ?? []).join('\n'),
+    })
+  }, [configForm, configInstance, configOpen])
 
   return (
     <div className="space-y-6">
@@ -448,16 +545,16 @@ export function UserInstancesPage() {
             <div className="text-sm text-destructive">{getErrorMessage(instances.error)}</div>
           ) : null}
 
-          <Table className="mt-2 min-w-[1240px]">
+          <Table className="mt-2 min-w-[1320px]">
             <colgroup>
               <col className="w-[14%]" />
               <col className="w-[9%]" />
               <col className="w-[11%]" />
               <col className="w-[7%]" />
               <col className="w-[10%]" />
-              <col className="w-[14%]" />
+              <col className="w-[18%]" />
+              <col className="w-[10%]" />
               <col className="w-[12%]" />
-              <col className="w-[14%]" />
               <col className="w-[9%]" />
             </colgroup>
             <TableHeader>
@@ -508,12 +605,15 @@ export function UserInstancesPage() {
                             Maturacao hoje: {i.maturationMessagesToday ?? 0}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {i.lastMaturationLog
-                              ? `${i.instanceName} -> ${i.lastMaturationLog.targetInstanceName} as ${formatDateTime(i.lastMaturationLog.occurredAt)}${i.lastMaturationLog.templateName ? ` · ${i.lastMaturationLog.templateName}` : ''}${i.lastMaturationLog.status !== 'SENT' && i.lastMaturationLog.errorMessage ? ` · ${i.lastMaturationLog.errorMessage}` : ''}`
-                              : i.maturationLastQueueAt
-                                ? `Na fila desde: ${formatDateTime(i.maturationLastQueueAt)}`
-                                : 'Entrando na fila'}
+                            Ciclo: {i.maturationMessagesPerCycle} msg · limite: {i.maturationDailyLimit}/dia
                           </div>
+                          <div className="text-xs text-muted-foreground">
+                            Intervalo: {i.maturationIntervalMinSeconds}s - {i.maturationIntervalMaxSeconds}s
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Grupos: {i.maturationContentGroupSlugs?.length ? i.maturationContentGroupSlugs.join(', ') : 'template/admin/fallback'}
+                          </div>
+                          <div className="text-xs text-muted-foreground">{summarizeLastLog(i)}</div>
                         </>
                       ) : null}
                     </div>
@@ -535,6 +635,18 @@ export function UserInstancesPage() {
                         disabled={!i.maturationEnabled || triggerMaturation.isPending}
                       >
                         Disparar agora
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8"
+                        title="Configurar maturacao"
+                        onClick={() => {
+                          setConfigInstance(i)
+                          setConfigOpen(true)
+                        }}
+                      >
+                        <Settings2 />
                       </Button>
                       <Button
                         size="icon"
@@ -681,6 +793,102 @@ export function UserInstancesPage() {
           ) : (
             <div className="text-sm text-muted-foreground">Sem QR Code retornado.</div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={configOpen}
+        onOpenChange={(open) => {
+          setConfigOpen(open)
+          if (!open) setConfigInstance(null)
+        }}
+      >
+        <DialogContent
+          title={configInstance ? `Maturacao · ${configInstance.instanceName}` : 'Configurar maturacao'}
+          description="Defina quantidade por ciclo, intervalo e quais grupos dinamicos entram na rotacao."
+          className="max-w-2xl"
+        >
+          <form
+            className="space-y-4"
+            onSubmit={configForm.handleSubmit((values) => saveMaturationConfig.mutate(values))}
+          >
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Mensagens por ciclo</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={10}
+                  {...configForm.register('messagesPerCycle', { valueAsNumber: true })}
+                />
+                {configForm.formState.errors.messagesPerCycle?.message ? (
+                  <p className="text-sm text-red-400">
+                    {configForm.formState.errors.messagesPerCycle.message}
+                  </p>
+                ) : null}
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Limite diario</label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={500}
+                  {...configForm.register('dailyLimit', { valueAsNumber: true })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Intervalo minimo (segundos)</label>
+                <Input
+                  type="number"
+                  min={15}
+                  max={3600}
+                  {...configForm.register('intervalMinSeconds', { valueAsNumber: true })}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Intervalo maximo (segundos)</label>
+                <Input
+                  type="number"
+                  min={15}
+                  max={3600}
+                  {...configForm.register('intervalMaxSeconds', { valueAsNumber: true })}
+                />
+                {configForm.formState.errors.intervalMaxSeconds?.message ? (
+                  <p className="text-sm text-red-400">
+                    {configForm.formState.errors.intervalMaxSeconds.message}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-sm text-muted-foreground">Grupos dinamicos (slugs)</label>
+              <Textarea
+                rows={5}
+                placeholder={'saudacoes\nfotos-rotina\naudios-curtos'}
+                {...configForm.register('contentGroupSlugsText')}
+              />
+              <p className="text-xs text-muted-foreground">
+                Um slug por linha. Se ficar vazio, a maturacao usa template, grupos do template e fallback admin.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setConfigOpen(false)
+                  setConfigInstance(null)
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={saveMaturationConfig.isPending}>
+                {saveMaturationConfig.isPending ? 'Salvando...' : 'Salvar configuracao'}
+              </Button>
+            </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

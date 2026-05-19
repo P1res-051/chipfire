@@ -9,6 +9,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { AuditService } from '../audit/audit.service';
 import { CreateInstanceDto } from './dto/create-instance.dto';
 import { AdminCreateInstanceDto } from './dto/admin-create-instance.dto';
+import { UpdateInstanceMaturationConfigDto } from './dto/update-instance-maturation-config.dto'
 import { UpdateInstanceMaturationDto } from './dto/update-instance-maturation.dto'
 import { InstanceMaturationService } from './instance-maturation.service'
 import { InstancesService } from './instances.service';
@@ -102,6 +103,15 @@ export class InstancesController {
     @Body() dto: UpdateInstanceMaturationDto,
   ) {
     return this.maturation.updateEnabled(user, id, dto.enabled)
+  }
+
+  @Put(':id/maturation/config')
+  updateMaturationConfig(
+    @CurrentUser() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() dto: UpdateInstanceMaturationConfigDto,
+  ) {
+    return this.maturation.updateConfig(user, id, dto)
   }
 
   @Post(':id/maturation/trigger')

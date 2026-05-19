@@ -135,6 +135,11 @@ model WhatsAppInstance {
   phoneNumber           String?
   status                InstanceStatus @default(WAITING_QR)
   maturationEnabled     Boolean        @default(false)
+  maturationMessagesPerCycle Int       @default(1)
+  maturationDailyLimit       Int       @default(24)
+  maturationIntervalMinSeconds Int     @default(180)
+  maturationIntervalMaxSeconds Int     @default(420)
+  maturationContentGroupSlugs String[] @default([])
   maturationNextSendAt  DateTime?
   maturationLastSentAt  DateTime?
   maturationLastQueueAt DateTime?
@@ -179,6 +184,8 @@ model InstanceMaturationLog {
   targetInstanceId   String?
   targetInstanceName String
   targetPhoneNumber  String?
+  messageType        MessageType @default(TEXT)
+  contentGroupSlug   String?
   templateId         String?
   templateName       String?
   text               String
