@@ -195,21 +195,33 @@ export class EvolutionService {
   async sendText(instanceName: string, toNumber: string, text: string) {
     // Docs: POST /message/sendText/{instance}
     // https://doc.evolution-api.com/v1/api-reference/message-controller/send-text
-    const res = await firstValueFrom(
-      this.http.post(
-        `${this.baseUrl}/message/sendText/${encodeURIComponent(instanceName)}`,
-        {
-          number: toNumber,
-          textMessage: { text },
-          options: { presence: 'composing', linkPreview: true },
-        },
-        {
-          headers: { ...this.headers(), 'Content-Type': 'application/json' },
-          timeout: 15_000,
-        },
-      ),
-    );
-    return res.data;
+    const payload = {
+      number: toNumber,
+      text,
+      textMessage: { text },
+      options: { presence: 'composing', linkPreview: true },
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.http.post(
+          `${this.baseUrl}/message/sendText/${encodeURIComponent(instanceName)}`,
+          payload,
+          {
+            headers: { ...this.headers(), 'Content-Type': 'application/json' },
+            timeout: 15_000,
+          },
+        ),
+      )
+      return res.data
+    } catch (e: any) {
+      const status = e?.response?.status
+      const data = e?.response?.data
+      this.logger.warn(
+        `[sendText] instance=${instanceName} to=${toNumber} failed status=${status} response=${JSON.stringify(data)}`,
+      )
+      throw e
+    }
   }
 
   async sendMedia(params: {
