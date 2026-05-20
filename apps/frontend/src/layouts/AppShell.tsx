@@ -1,4 +1,4 @@
-import { LogOut, Shield, User } from 'lucide-react'
+import { LogOut, Moon, Shield, Sun, User } from 'lucide-react'
 import { Link, NavLink, useNavigate } from 'react-router-dom'
 
 import chipfireIcon from '@/assets/icon-chipfire.png'
@@ -7,6 +7,7 @@ import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/toast'
+import { useTheme } from '@/theme/theme'
 
 type Item = { to: string; label: string }
 
@@ -35,6 +36,7 @@ export function AppShell(props: { variant: 'admin' | 'user'; children: React.Rea
   const items = props.variant === 'admin' ? adminItems : userItems
   const navigate = useNavigate()
   const { toast } = useToast()
+  const { theme, toggleTheme } = useTheme()
 
   async function logout() {
     try {
@@ -55,18 +57,30 @@ export function AppShell(props: { variant: 'admin' | 'user'; children: React.Rea
       <div className="flex">
         <aside className="hidden shrink-0 md:flex md:w-64 md:flex-col md:gap-2 md:p-4 lg:w-72">
           <div className="rounded-xl border bg-card p-4 shadow-glow">
-            <Link
-              to={props.variant === 'admin' ? '/admin/dashboard' : '/user/dashboard'}
-              className="flex items-center gap-3"
-            >
-              <img src={chipfireIcon} alt="ChipFire" className="h-7 w-7 shrink-0 object-contain" />
-              <span className="font-semibold text-primary">ChipFire</span>
-              {props.variant === 'admin' ? (
-                <Shield className="ml-auto h-4 w-4 text-primary/80" />
-              ) : (
-                <User className="ml-auto h-4 w-4 text-accent/80" />
-              )}
-            </Link>
+            <div className="flex items-center gap-2">
+              <Link
+                to={props.variant === 'admin' ? '/admin/dashboard' : '/user/dashboard'}
+                className="flex min-w-0 flex-1 items-center gap-3"
+              >
+                <img src={chipfireIcon} alt="ChipFire" className="h-7 w-7 shrink-0 object-contain" />
+                <span className="font-semibold text-primary">ChipFire</span>
+                {props.variant === 'admin' ? (
+                  <Shield className="ml-auto h-4 w-4 text-primary/80" />
+                ) : (
+                  <User className="ml-auto h-4 w-4 text-accent/80" />
+                )}
+              </Link>
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="h-8 w-8 shrink-0"
+                onClick={toggleTheme}
+                title={theme === 'light' ? 'Ativar modo escuro' : 'Ativar modo claro'}
+              >
+                {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+              </Button>
+            </div>
             <p className="mt-1 text-[11px] leading-snug text-muted-foreground/80">
               Operacao inteligente · Seguranca · Automacao
             </p>

@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 
 import { AppRouter } from '@/app/Router'
 import { ToastProvider } from '@/components/ui/toast'
+import { ThemeProvider } from '@/theme/theme'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,11 +18,13 @@ const queryClient = new QueryClient({
 export function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <BrowserRouter>
-          <AppRouter />
-        </BrowserRouter>
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <AppRouter />
+          </BrowserRouter>
+        </ToastProvider>
+      </ThemeProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   )

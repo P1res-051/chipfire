@@ -21,7 +21,7 @@ spec:
     spec:
       initContainers:
         - name: prisma-migrate
-          image: p1res/chipfire-backend:v1.0.19
+          image: p1res/chipfire-backend:v1.0.20
           command: ["npx", "prisma@6.19.3", "migrate", "deploy"]
           env:
             - name: DATABASE_URL
@@ -32,7 +32,7 @@ spec:
 
       containers:
         - name: backend
-          image: p1res/chipfire-backend:v1.0.19
+          image: p1res/chipfire-backend:v1.0.20
           ports:
             - name: http
               containerPort: 3000
