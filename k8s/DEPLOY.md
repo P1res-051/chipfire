@@ -22,7 +22,7 @@ kubectl config use-context k8s-sp1
 
 ## Passo 2 — Preencher os secrets
 
-Edite `01-secrets.yaml` com os valores reais:
+Copie `01-secrets.example.yaml` para `01-secrets.yaml` fora do commit e preencha os valores reais:
 
 ```bash
 # Gerar JWT secrets
@@ -37,7 +37,9 @@ openssl rand -hex 32      # EVOLUTION_WEBHOOK_SECRET
 Preencher:
 - `POSTGRES_PASSWORD` → senha do usuário `evo` no pg-sp1
 - `DATABASE_ADMIN_URL` → `postgresql://postgres:SENHA@chipfire-postgres:5432/postgres`
-- Imagens Docker Hub já configuradas: `p1res051/chipfire-backend:v1.0.0` e `p1res051/chipfire-frontend:v1.0.0`
+- O registry usado pelos manifests e pelo `build-push.ps1` e `p1res`.
+- Antes de aplicar os manifests, gere uma unica tag nova para backend e frontend e atualize
+  `k8s/backend/deployment.yaml` e `k8s/frontend/deployment.yaml` para essa tag.
 
 ## Passo 3 — (Opcional) Selar os secrets com Sealed Secrets
 
@@ -59,7 +61,7 @@ O bucket `evo-crm` não existe ainda no MinIO do namespace `evolution`.
 
 ```bash
 kubectl exec -n evolution minio-0 -- sh -c "
-  mc alias set local http://localhost:9000 evolution_admin 'aCWnJU4J3u5x8GiHaUcrcMzbwzmqKic' &&
+  mc alias set local http://localhost:9000 evolution_admin '__SET_MINIO_ROOT_PASSWORD__' &&
   mc mb local/evo-crm &&
   mc anonymous set download local/evo-crm
 "
@@ -72,7 +74,7 @@ kubectl exec -n evolution minio-0 -- sh -c "
 kubectl config current-context  # deve ser k8s-sp1
 
 # 1. Secrets e ConfigMap
-kubectl apply -f k8s/01-secrets.yaml     # ou 01-sealedsecrets.yaml se sellado
+kubectl apply -f k8s/01-secrets.yaml     # ou 01-sealedsecrets.yaml se selado
 kubectl apply -f k8s/02-configmap.yaml
 
 # 2. Services externos (Postgres + MinIO)

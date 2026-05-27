@@ -11,7 +11,7 @@ $ErrorActionPreference = "Stop"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 # --- Configuracao -------------------------------------------------------
-$REGISTRY        = "p1res051"
+$REGISTRY        = "p1res"
 $VERSION_FILE    = "$PSScriptRoot\VERSION"
 $VITE_API_URL    = "https://chipfire-api.automation.app.br/api"
 $VITE_APP_URL    = "https://chipfire.automation.app.br"

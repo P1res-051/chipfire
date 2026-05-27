@@ -96,6 +96,23 @@ export class InstancesController {
     return this.instances.disconnect(user, id);
   }
 
+  @Roles(UserRole.ADMIN)
+  @Put('maturation/connected/enable')
+  async enableConnectedMaturation(@Req() req: any, @CurrentUser() actor: JwtPayload) {
+    const result = await this.maturation.enableConnectedForAdmin(actor)
+
+    await this.audit.log({
+      userId: actor.sub,
+      action: 'ADMIN_INSTANCE_MATURATION_ENABLE_CONNECTED',
+      entity: 'WhatsAppInstance',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      meta: result,
+    })
+
+    return result
+  }
+
   @Put(':id/maturation')
   updateMaturation(
     @CurrentUser() user: JwtPayload,

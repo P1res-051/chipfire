@@ -231,21 +231,39 @@ export class EvolutionService {
     fileName: string;
     caption?: string;
     mediaBase64OrUrl: string;
+    mimeType?: string | null;
   }) {
+    if (params.mediaType === 'audio') {
+      // Docs: POST /message/sendWhatsAppAudio/{instance}
+      // https://doc.evolution-api.com/v2/api-reference/message-controller/send-audio
+      const res = await firstValueFrom(
+        this.http.post(
+          `${this.baseUrl}/message/sendWhatsAppAudio/${encodeURIComponent(params.instanceName)}`,
+          {
+            number: params.toNumber,
+            audio: params.mediaBase64OrUrl,
+          },
+          {
+            headers: { ...this.headers(), 'Content-Type': 'application/json' },
+            timeout: 30_000,
+          },
+        ),
+      );
+      return res.data;
+    }
+
     // Docs: POST /message/sendMedia/{instance}
-    // https://doc.evolution-api.com/v1/api-reference/message-controller/send-media
+    // https://doc.evolution-api.com/v2/api-reference/message-controller/send-media
     const res = await firstValueFrom(
       this.http.post(
         `${this.baseUrl}/message/sendMedia/${encodeURIComponent(params.instanceName)}`,
         {
           number: params.toNumber,
-          mediaMessage: {
-            mediaType: params.mediaType,
-            fileName: params.fileName,
-            caption: params.caption ?? '',
-            media: params.mediaBase64OrUrl,
-          },
-          options: { presence: 'composing' },
+          mediatype: params.mediaType,
+          mimetype: params.mimeType ?? this.defaultMimeType(params.mediaType),
+          caption: params.caption ?? '',
+          media: params.mediaBase64OrUrl,
+          fileName: params.fileName,
         },
         {
           headers: { ...this.headers(), 'Content-Type': 'application/json' },
@@ -254,5 +272,18 @@ export class EvolutionService {
       ),
     );
     return res.data;
+  }
+
+  private defaultMimeType(mediaType: 'image' | 'video' | 'audio' | 'document') {
+    switch (mediaType) {
+      case 'image':
+        return 'image/jpeg';
+      case 'video':
+        return 'video/mp4';
+      case 'audio':
+        return 'audio/mpeg';
+      default:
+        return 'application/octet-stream';
+    }
   }
 }

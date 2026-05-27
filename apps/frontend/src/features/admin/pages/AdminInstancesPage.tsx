@@ -26,6 +26,7 @@ type Instance = {
   instanceName: string
   phoneNumber: string | null
   status: InstanceStatus
+  maturationEnabled: boolean
   qrCode: string | null
   messagesSentToday: number
   messagesReceivedToday: number
@@ -256,6 +257,34 @@ export function AdminInstancesPage() {
       toast({ title: 'Falha ao remover', description: getErrorMessage(e), variant: 'destructive' }),
   })
 
+  const enableConnectedMaturation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.put('/instances/maturation/connected/enable')
+      return data as {
+        connectedCount: number
+        enabledCount: number
+        alreadyEnabledCount: number
+      }
+    },
+    onSuccess: async (data) => {
+      toast({
+        title: 'Maturacao ativada',
+        description:
+          data.enabledCount > 0
+            ? `${data.enabledCount} de ${data.connectedCount} instancias conectadas entraram na fila.`
+            : `${data.connectedCount} instancias conectadas ja estavam com maturacao ativa.`,
+        variant: 'success',
+      })
+      await qc.invalidateQueries({ queryKey: ['admin', 'instances'] })
+    },
+    onError: (e) =>
+      toast({
+        title: 'Falha ao ativar maturacao',
+        description: getErrorMessage(e),
+        variant: 'destructive',
+      }),
+  })
+
   React.useEffect(() => {
     if (!qrOpen || !qrInstanceId) return
 
@@ -327,9 +356,21 @@ export function AdminInstancesPage() {
             Operação e visibilidade: status, QR Code, reconexão e remoção.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="w-full sm:w-auto">
-          <Plus /> Nova instância
-        </Button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <Button
+            variant="outline"
+            onClick={() => {
+              const ok = window.confirm('Ativar maturacao em todos os WhatsApps conectados?')
+              if (ok) enableConnectedMaturation.mutate()
+            }}
+            disabled={enableConnectedMaturation.isPending}
+          >
+            <PlugZap /> Ativar maturacao nas conectadas
+          </Button>
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus /> Nova instância
+          </Button>
+        </div>
       </div>
 
       <Card>
@@ -381,15 +422,16 @@ export function AdminInstancesPage() {
             <div className="text-sm text-destructive">{getErrorMessage(instances.error)}</div>
           ) : null}
 
-          <Table className="mt-2 min-w-[1040px]">
+          <Table className="mt-2 min-w-[1120px]">
             <colgroup>
-              <col className="w-[18%]" />
-              <col className="w-[24%]" />
+              <col className="w-[16%]" />
+              <col className="w-[21%]" />
+              <col className="w-[11%]" />
               <col className="w-[12%]" />
-              <col className="w-[13%]" />
-              <col className="w-[9%]" />
-              <col className="w-[13%]" />
-              <col className="w-[13%]" />
+              <col className="w-[8%]" />
+              <col className="w-[10%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
               <col className="w-[130px]" />
             </colgroup>
             <TableHeader>
@@ -399,6 +441,7 @@ export function AdminInstancesPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Telefone</TableHead>
                 <TableHead>Msgs</TableHead>
+                <TableHead>Maturacao</TableHead>
                 <TableHead>Saúde</TableHead>
                 <TableHead>Última atividade</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
@@ -418,6 +461,11 @@ export function AdminInstancesPage() {
                     {i.phoneNumber ?? '—'}
                   </TableCell>
                   <TableCell className="text-center">{(i.messagesSentToday ?? 0) + (i.messagesReceivedToday ?? 0)}</TableCell>
+                  <TableCell>
+                    <Badge variant={i.maturationEnabled ? 'success' : 'outline'}>
+                      {i.maturationEnabled ? 'Ligada' : 'OFF'}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-muted-foreground truncate" title={getHealthInfo(i).title}>
                     {(() => {
                       const h = getHealthInfo(i)
@@ -511,7 +559,7 @@ export function AdminInstancesPage() {
               ))}
               {!instances.isPending && (instances.data?.length ?? 0) === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="py-6 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={9} className="py-6 text-center text-sm text-muted-foreground">
                     Nenhuma instância encontrada.
                   </TableCell>
                 </TableRow>

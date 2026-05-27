@@ -38,6 +38,7 @@ type ResolvedGroupPayload = {
   mediaId?: string
   fileName?: string
   mediaUrl?: string
+  mimeType?: string | null
 }
 
 type OutgoingMaturationMessage = {
@@ -50,6 +51,7 @@ type OutgoingMaturationMessage = {
     mediaType: 'image' | 'video' | 'audio' | 'document'
     fileName: string
     mediaBase64OrUrl: string
+    mimeType?: string | null
   }
 }
 
@@ -124,6 +126,37 @@ export class InstanceMaturationService implements OnModuleInit {
     }
 
     return updated
+  }
+
+  async enableConnectedForAdmin(user: JwtPayload) {
+    if (user.role !== UserRole.ADMIN) {
+      throw new ForbiddenException('Apenas admins podem ativar maturacao em lote')
+    }
+
+    const connected = await this.prisma.whatsAppInstance.findMany({
+      where: { status: InstanceStatus.CONNECTED },
+      select: { id: true, maturationEnabled: true },
+    })
+    const instancesToEnable = connected.filter((instance) => !instance.maturationEnabled)
+
+    if (instancesToEnable.length > 0) {
+      await this.prisma.whatsAppInstance.updateMany({
+        where: { id: { in: instancesToEnable.map((instance) => instance.id) } },
+        data: {
+          maturationEnabled: true,
+          maturationLastQueueAt: new Date(),
+          maturationNextSendAt: null,
+        },
+      })
+
+      await Promise.all(instancesToEnable.map((instance) => this.enqueue(instance.id)))
+    }
+
+    return {
+      connectedCount: connected.length,
+      enabledCount: instancesToEnable.length,
+      alreadyEnabledCount: connected.length - instancesToEnable.length,
+    }
   }
 
   async updateConfig(user: JwtPayload, instanceId: string, dto: UpdateInstanceMaturationConfigDto) {
@@ -284,6 +317,7 @@ export class InstanceMaturationService implements OnModuleInit {
             fileName: message.media.fileName,
             caption: message.text,
             mediaBase64OrUrl: message.media.mediaBase64OrUrl,
+            mimeType: message.media.mimeType,
           })
         } else {
           await this.evolution.sendText(origin.instanceName, target.phoneNumber, message.text)
@@ -379,6 +413,7 @@ export class InstanceMaturationService implements OnModuleInit {
           mediaType: this.mapMediaType(directDynamicPayload.type),
           fileName: directDynamicPayload.fileName ?? `${directDynamicPayload.slug}.${this.extensionForType(directDynamicPayload.type)}`,
           mediaBase64OrUrl: directDynamicPayload.mediaUrl ?? '',
+          mimeType: directDynamicPayload.mimeType,
         },
       }
     }
@@ -396,6 +431,7 @@ export class InstanceMaturationService implements OnModuleInit {
             renderedTemplate.primaryMedia.fileName ??
             `${renderedTemplate.primaryMedia.slug}.${this.extensionForType(renderedTemplate.primaryMedia.type)}`,
           mediaBase64OrUrl: renderedTemplate.primaryMedia.mediaUrl,
+          mimeType: renderedTemplate.primaryMedia.mimeType,
         },
       }
     }
@@ -417,7 +453,7 @@ export class InstanceMaturationService implements OnModuleInit {
     const renderedBase = this.renderTemplate(template.content, origin.instanceName, target.name)
 
     if (!template.ownerUserId) {
-      return { text: renderedBase, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string } }
+      return { text: renderedBase, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string; mimeType?: string | null } }
     }
 
     const fakeContact = {
@@ -449,7 +485,7 @@ export class InstanceMaturationService implements OnModuleInit {
       template.mediaId
         ? await this.prisma.mediaLibrary.findUnique({
             where: { id: template.mediaId },
-            select: { id: true, name: true, publicUrl: true, filePath: true, type: true },
+            select: { id: true, name: true, publicUrl: true, filePath: true, type: true, mimeType: true },
           })
         : null
 
@@ -467,21 +503,22 @@ export class InstanceMaturationService implements OnModuleInit {
           type: this.normalizeMessageType(directTemplateMedia.type),
           mediaUrl: directTemplateMedia.publicUrl ?? directTemplateMedia.filePath ?? '',
           fileName: directTemplateMedia.name,
+          mimeType: directTemplateMedia.mimeType,
         },
       }
     }
 
     if (!firstMedia) {
-      return { text, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string } }
+      return { text, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string; mimeType?: string | null } }
     }
 
     const media = await this.prisma.mediaLibrary.findUnique({
       where: { id: firstMedia.mediaId },
-      select: { id: true, name: true, publicUrl: true, filePath: true, type: true },
+      select: { id: true, name: true, publicUrl: true, filePath: true, type: true, mimeType: true },
     })
 
     if (!media || (!media.publicUrl && !media.filePath)) {
-      return { text, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string } }
+      return { text, primaryMedia: null as null | { slug: string; type: MessageType; mediaUrl: string; fileName?: string; mimeType?: string | null } }
     }
 
     return {
@@ -491,6 +528,7 @@ export class InstanceMaturationService implements OnModuleInit {
         type: this.normalizeMessageType(firstMedia.type),
         mediaUrl: media.publicUrl ?? media.filePath ?? '',
         fileName: media.name,
+        mimeType: media.mimeType,
       },
     }
   }
@@ -534,6 +572,7 @@ export class InstanceMaturationService implements OnModuleInit {
           mediaId: media.id,
           fileName: media.name,
           mediaUrl: media.publicUrl ?? media.filePath ?? undefined,
+          mimeType: media.mimeType,
         }
       }
     }

@@ -4,8 +4,8 @@ import { JwtService } from '@nestjs/jwt';
 import { UserRole, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { createHash } from 'crypto';
-import { nanoid } from 'nanoid';
 
+import { randomUrlToken } from '../common/random';
 import { Env } from '../config/env';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -31,7 +31,7 @@ export class AuthService {
 
   private async createRefreshSession(userId: string) {
     const ttl = this.config.get('JWT_REFRESH_TTL_SECONDS', { infer: true });
-    const refreshToken = nanoid(64);
+    const refreshToken = randomUrlToken(64);
     const refreshTokenHash = this.hashToken(refreshToken);
     const expiresAt = new Date(Date.now() + ttl * 1000);
 

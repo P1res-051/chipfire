@@ -5,7 +5,7 @@ import { StorageService } from './storage.service'
 import { CreateTextMediaDto } from './dto/create-text-media.dto'
 import { UpdateMediaDto } from './dto/update-media.dto'
 import { MediaType } from '@prisma/client'
-import { nanoid } from 'nanoid'
+import { randomUrlToken } from '../common/random'
 
 @Injectable()
 export class MediaService {
@@ -49,7 +49,7 @@ export class MediaService {
       .replace(/^-+|-+$/g, '')
       .substring(0, 50)
 
-    let slug = baseSlug || nanoid(8)
+    let slug = baseSlug || randomUrlToken(8)
     let counter = 1
 
     while (

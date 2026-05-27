@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { UserRole, UserStatus } from '@prisma/client';
-import { nanoid } from 'nanoid';
 
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import type { JwtPayload } from '../auth/jwt.payload';
 import { AuditService } from '../audit/audit.service';
+import { randomUrlToken } from '../common/random';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
@@ -82,7 +82,7 @@ export class AdminUsersController {
 
   @Post(':id/reset-password')
   async resetPassword(@Req() req: any, @Param('id') id: string, @Body() body: { newPassword?: string }) {
-    const newPassword = body?.newPassword ?? `Tmp@${nanoid(10)}`;
+    const newPassword = body?.newPassword ?? `Tmp@${randomUrlToken(10)}`;
     const user = await this.users.resetPassword(id, newPassword);
     const actor = req.user as JwtPayload | undefined;
     await this.audit.log({

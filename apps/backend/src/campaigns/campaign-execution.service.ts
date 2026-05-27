@@ -247,9 +247,10 @@ export class CampaignExecutionService {
           instanceName: instance.instanceName,
           toNumber: phone,
           mediaType: typeMap[primaryMedia.type] || 'document',
-          fileName: primaryMedia.fileName || 'media',
+          fileName: primaryMedia.fileName || primaryMedia.name || 'media',
           caption: textToSend,
           mediaBase64OrUrl: primaryMedia.publicUrl || primaryMedia.filePath || '',
+          mimeType: primaryMedia.mimeType,
         })
       } else {
         result = await this.evolution.sendText(instance.instanceName, phone, textToSend)

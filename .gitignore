@@ -5,6 +5,7 @@ build
 .env
 .env.*
 !.env.example
+k8s/01-secrets.yaml
 
 # Backups / arquivos temporários (não versionar)
 BACKUP_*
