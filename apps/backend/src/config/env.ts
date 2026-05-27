@@ -20,6 +20,7 @@ export const envSchema = z.object({
 
   // URL pública da API usada como base para registrar webhooks na Evolution API
   API_URL: z.string().default(''),
+  API_INTERNAL_URL: z.string().optional().default(''),
 
   MINIO_ENABLED: z.coerce.boolean().default(true),
   MINIO_ENDPOINT: z.string().default('http://minio:9000'),

@@ -9,16 +9,24 @@ import { Env } from '../config/env';
 export class EvolutionService {
   private readonly logger = new Logger(EvolutionService.name);
   private readonly baseUrl: string;
+  private readonly publicApiBaseUrl: string;
+  private readonly internalApiBaseUrl: string;
   private readonly apiKey: string;
   private readonly webhookSecret: string;
+  private readonly minioEndpoint: string;
+  private readonly minioPublicUrl?: string;
 
   constructor(
     private readonly http: HttpService,
     config: ConfigService<Env, true>,
   ) {
     this.baseUrl = config.get('EVOLUTION_API_URL_INTERNAL', { infer: true });
+    this.publicApiBaseUrl = config.get('API_URL', { infer: true }).replace(/\/api\/?$/, '');
+    this.internalApiBaseUrl = config.get('API_INTERNAL_URL', { infer: true }).replace(/\/api\/?$/, '');
     this.apiKey = config.get('EVOLUTION_API_KEY', { infer: true });
     this.webhookSecret = config.get('EVOLUTION_WEBHOOK_SECRET', { infer: true });
+    this.minioEndpoint = config.get('MINIO_ENDPOINT', { infer: true });
+    this.minioPublicUrl = config.get('MINIO_PUBLIC_URL', { infer: true }) || undefined;
   }
 
   private headers() {
@@ -233,6 +241,8 @@ export class EvolutionService {
     mediaBase64OrUrl: string;
     mimeType?: string | null;
   }) {
+    const media = this.normalizeMediaUrl(params.mediaBase64OrUrl);
+
     if (params.mediaType === 'audio') {
       // Docs: POST /message/sendWhatsAppAudio/{instance}
       // https://doc.evolution-api.com/v2/api-reference/message-controller/send-audio
@@ -241,7 +251,7 @@ export class EvolutionService {
           `${this.baseUrl}/message/sendWhatsAppAudio/${encodeURIComponent(params.instanceName)}`,
           {
             number: params.toNumber,
-            audio: params.mediaBase64OrUrl,
+            audio: media,
           },
           {
             headers: { ...this.headers(), 'Content-Type': 'application/json' },
@@ -262,7 +272,7 @@ export class EvolutionService {
           mediatype: params.mediaType,
           mimetype: params.mimeType ?? this.defaultMimeType(params.mediaType),
           caption: params.caption ?? '',
-          media: params.mediaBase64OrUrl,
+          media,
           fileName: params.fileName,
         },
         {
@@ -272,6 +282,48 @@ export class EvolutionService {
       ),
     );
     return res.data;
+  }
+
+  private normalizeMediaUrl(media: string) {
+    if (!media) return media;
+
+    // Caminhos relativos (ex: /storage/uploads/...) precisam virar URL absoluta
+    if (media.startsWith('/')) {
+      const base = this.internalApiBaseUrl || this.publicApiBaseUrl;
+      if (!base) return media;
+      return `${base}${media}`;
+    }
+
+    // URLs absolutas: ajustar quando o host "público" não é acessível pela Evolution API (container).
+    try {
+      const url = new URL(media);
+
+      // Se a mídia veio com MINIO_PUBLIC_URL (ex: http://localhost:9000),
+      // trocar para o endpoint interno (ex: http://minio:9000) para a Evolution conseguir baixar.
+      if (this.minioPublicUrl) {
+        const pub = this.minioPublicUrl.replace(/\/+$/, '');
+        const internal = this.minioEndpoint.replace(/\/+$/, '');
+        if (media.startsWith(pub + '/')) {
+          return internal + media.slice(pub.length);
+        }
+      }
+
+      // Se a URL aponta para localhost/127.0.0.1, isso não resolve dentro do container da Evolution.
+      // Se API_INTERNAL_URL estiver configurada, reescreve o host.
+      if (
+        this.internalApiBaseUrl &&
+        (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+      ) {
+        const base = new URL(this.internalApiBaseUrl);
+        url.protocol = base.protocol;
+        url.host = base.host;
+        return url.toString();
+      }
+
+      return media;
+    } catch {
+      return media;
+    }
   }
 
   private defaultMimeType(mediaType: 'image' | 'video' | 'audio' | 'document') {

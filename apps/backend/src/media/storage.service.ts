@@ -18,9 +18,12 @@ export class StorageService {
   private storageDir: string
 
   constructor(private configService: ConfigService) {
-    this.minioEnabled = this.configService.get<string>('MINIO_ENABLED') === 'true'
+    const minioEnabledRaw = this.configService.get('MINIO_ENABLED')
+    this.minioEnabled = minioEnabledRaw === true || minioEnabledRaw === 'true'
     this.minioBucket = this.configService.get<string>('MINIO_BUCKET', 'evo-crm')
-    this.storageDir = path.join(process.cwd(), '..', '..', 'storage', 'uploads')
+    this.storageDir =
+      this.configService.get<string>('STORAGE_DIR') ??
+      path.join(process.cwd(), 'storage', 'uploads')
 
     // Garantir que a pasta de storage local existe
     if (!fs.existsSync(this.storageDir)) {
@@ -50,9 +53,12 @@ export class StorageService {
       throw new Error('MinIO config incompleto')
     }
 
+    const parsed = new URL(endpoint)
+
     this.minioClient = new MinioClient({
-      endPoint: endpoint.replace('http://', '').replace('https://', ''),
-      useSSL: endpoint.startsWith('https'),
+      endPoint: parsed.hostname,
+      port: parsed.port ? Number(parsed.port) : parsed.protocol === 'https:' ? 443 : 80,
+      useSSL: parsed.protocol === 'https:',
       accessKey: rootUser,
       secretKey: rootPassword,
     })
@@ -100,7 +106,9 @@ export class StorageService {
       { 'Content-Type': file.mimetype },
     )
 
-    const publicUrl = this.configService.get<string>('MINIO_PUBLIC_URL')
+    const publicUrl =
+      this.configService.get<string>('MINIO_PUBLIC_URL') ??
+      this.configService.get<string>('MINIO_ENDPOINT')
     return {
       publicUrl: `${publicUrl}/${this.minioBucket}/${fileName}`,
       filePath: `minio://${this.minioBucket}/${fileName}`,
@@ -113,9 +121,13 @@ export class StorageService {
   ): StorageUploadResult {
     const filePath = path.join(this.storageDir, fileName)
     fs.writeFileSync(filePath, file.buffer)
+    const apiUrl = this.configService.get<string>('API_URL') ?? ''
+    const publicBaseUrl = apiUrl.replace(/\/api\/?$/, '')
 
     return {
-      publicUrl: `/storage/uploads/${fileName}`,
+      publicUrl: publicBaseUrl
+        ? `${publicBaseUrl}/storage/uploads/${fileName}`
+        : `/storage/uploads/${fileName}`,
       filePath: `local://${fileName}`,
     }
   }

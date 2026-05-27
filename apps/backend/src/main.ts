@@ -1,6 +1,8 @@
 import { NestFactory } from '@nestjs/core';
+import * as express from 'express';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
+import * as path from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
@@ -9,6 +11,9 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.use(helmet());
+
+  const storageDir = process.env.STORAGE_DIR ?? path.join(process.cwd(), 'storage', 'uploads');
+  app.use('/storage/uploads', express.static(storageDir));
 
   const origins = (process.env.CORS_ORIGINS ?? '')
     .split(',')
