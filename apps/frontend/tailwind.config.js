@@ -34,10 +34,10 @@ export default {
         sm: 'calc(var(--radius) - 4px)'
       },
       boxShadow: {
-        glow: '0 0 0 1px hsl(var(--border)), 0 0 20px rgba(255, 109, 0, 0.15)',
-        'glow-orange': '0 0 0 1px rgba(255, 109, 0, 0.3), 0 0 20px rgba(255, 109, 0, 0.15)',
-        'glow-purple': '0 0 0 1px rgba(199, 125, 255, 0.3), 0 0 20px rgba(199, 125, 255, 0.12)',
-        'glow-green': '0 0 0 1px rgba(34, 197, 94, 0.35), 0 0 20px rgba(34, 197, 94, 0.18)'
+        glow: '0 1px 2px rgba(15, 23, 42, 0.06)',
+        'glow-orange': '0 1px 2px rgba(15, 23, 42, 0.08)',
+        'glow-purple': '0 1px 2px rgba(15, 23, 42, 0.08)',
+        'glow-green': '0 1px 2px rgba(15, 23, 42, 0.08)'
       }
     }
   },

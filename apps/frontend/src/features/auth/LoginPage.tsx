@@ -64,11 +64,11 @@ export function LoginPage() {
           <CardContent className="flex h-full flex-col justify-between p-8 lg:p-10">
             <div>
               <div className="mb-6 flex items-center gap-4">
-                <img src={chipfireIcon} alt="ChipFire" className="h-16 w-16 rounded-2xl object-contain" />
+                <img src={chipfireIcon} alt="ChipFire" className="h-16 w-16 rounded-lg object-contain" />
                 <div>
                   <div className="text-3xl font-semibold text-primary">ChipFire</div>
                   <div className="text-sm text-muted-foreground">
-                    Operacao inteligente · Seguranca · Automacao
+                    Operação inteligente · Segurança · Automação
                   </div>
                 </div>
               </div>
@@ -79,27 +79,27 @@ export function LoginPage() {
                   Ambiente corporativo
                 </div>
                 <h1 className="mb-4 text-4xl font-semibold tracking-tight text-foreground">
-                  Acesse sua operacao com uma interface limpa, clara e pronta para alternar entre claro e escuro.
+                  Acesse sua operação em uma central limpa, clara e pronta para o trabalho diário.
                 </h1>
                 <p className="max-w-lg text-sm leading-6 text-muted-foreground">
-                  A linguagem visual enterprise agora vira base do sistema inteiro, com menos ruido e mais consistencia para operacao diaria.
+                  Gestão de instâncias, mensagens, contatos e mídia em um painel mais objetivo, com menos ruído e mais consistência.
                 </p>
               </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl border border-border bg-background/80 p-4">
+              <div className="rounded-lg border border-border bg-background/80 p-4">
                 <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Painel</div>
                 <div className="mt-2 text-2xl font-semibold">24</div>
-                <div className="mt-1 text-sm text-muted-foreground">instancias conectadas</div>
+                <div className="mt-1 text-sm text-muted-foreground">instâncias conectadas</div>
               </div>
-              <div className="rounded-2xl border border-border bg-background/80 p-4">
+              <div className="rounded-lg border border-border bg-background/80 p-4">
                 <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Fila</div>
                 <div className="mt-2 text-2xl font-semibold">312</div>
-                <div className="mt-1 text-sm text-muted-foreground">acoes em processamento</div>
+                <div className="mt-1 text-sm text-muted-foreground">ações em processamento</div>
               </div>
-              <div className="rounded-2xl border border-border bg-background/80 p-4">
-                <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Politica</div>
+              <div className="rounded-lg border border-border bg-background/80 p-4">
+                <div className="text-xs uppercase tracking-[0.12em] text-muted-foreground">Política</div>
                 <div className="mt-2 text-2xl font-semibold">Opt-in</div>
                 <div className="mt-1 text-sm text-muted-foreground">somente contatos permitidos</div>
               </div>
