@@ -70,13 +70,16 @@ export function AdminMediaPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border bg-gradient-to-br from-[#071418] via-[#071418] to-[#0F5739]/30 p-6 md:flex-row md:items-center md:justify-between">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#45C9A4] via-[#52C9EB] to-[#46B5A9]" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#52C9EB]/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#45C9A4]/10 blur-2xl" />
         <div>
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold">Biblioteca de mídia</h1>
+            <h1 className="text-2xl font-semibold text-white">Biblioteca de mídia</h1>
             <ApiStatusPill />
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-white/70">
             Arquivos e conteúdo reutilizável para campanhas e templates.
           </p>
         </div>
@@ -85,11 +88,15 @@ export function AdminMediaPage() {
           <Button
             variant="outline"
             onClick={() => setTextOpen(true)}
+            className="border-[#3D8E66]/60 bg-transparent text-white hover:bg-white/5 hover:text-white"
           >
             <Plus className="mr-2 h-4 w-4" />
             Novo texto
           </Button>
-          <Button onClick={() => setUploadOpen(true)}>
+          <Button
+            onClick={() => setUploadOpen(true)}
+            className="bg-gradient-to-r from-[#52C9EB] to-[#45C9A4] text-[#071418] hover:opacity-90"
+          >
             <Plus className="mr-2 h-4 w-4" />
             Fazer upload
           </Button>
@@ -103,10 +110,15 @@ export function AdminMediaPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nome, slug ou tag…"
+            className="focus-visible:ring-[#52C9EB]/40"
           />
         </div>
         <div className="w-full md:w-48">
-          <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as any)}>
+          <Select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as any)}
+            className="focus-visible:ring-[#52C9EB]/40"
+          >
             <option value="ALL">Todos os tipos</option>
             <option value="IMAGE">Imagem</option>
             <option value="VIDEO">Vídeo</option>

@@ -105,6 +105,7 @@ export function MediaCreateTextDialog({
             <Button
               type="submit"
               disabled={createMutation.isPending}
+              className="bg-gradient-to-r from-[#52C9EB] to-[#45C9A4] text-[#071418] hover:opacity-90"
             >
               {createMutation.isPending ? 'Criando…' : 'Criar'}
             </Button>

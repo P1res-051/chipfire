@@ -81,7 +81,7 @@ export function MediaUploadDialog({
         <div className="space-y-4">
           {/* Área de upload */}
           <div
-            className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-8 text-center cursor-pointer hover:border-muted-foreground/50 transition-colors"
+            className="cursor-pointer rounded-lg border-2 border-dashed border-[#46B5A9]/40 p-8 text-center transition-colors hover:border-[#52C9EB]/60"
             onClick={() => fileInputRef.current?.click()}
           >
             <Upload className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
@@ -129,6 +129,7 @@ export function MediaUploadDialog({
             <Button
               onClick={() => uploadMutation.mutate()}
               disabled={!file || uploadMutation.isPending}
+              className="bg-gradient-to-r from-[#52C9EB] to-[#45C9A4] text-[#071418] hover:opacity-90"
             >
               {uploadMutation.isPending ? 'Enviando…' : 'Enviar'}
             </Button>

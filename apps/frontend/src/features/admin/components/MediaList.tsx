@@ -106,7 +106,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
     return (
       <div className="space-y-3">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-12 bg-muted rounded animate-pulse" />
+          <div key={i} className="h-12 animate-pulse rounded bg-gradient-to-r from-[#071418]/10 via-muted to-[#071418]/10" />
         ))}
       </div>
     )
@@ -126,24 +126,24 @@ export function MediaList({ media, isLoading }: MediaListProps) {
     <>
       <Table className="mt-4 min-w-[980px]">
           <TableHeader>
-            <TableRow>
+            <TableRow className="bg-gradient-to-r from-[#071418]/5 via-transparent to-[#0F5739]/5">
               <TableHead className="w-[280px]">Nome</TableHead>
               <TableHead className="w-[140px]">Tipo</TableHead>
               <TableHead className="w-[220px]">Slug</TableHead>
               <TableHead className="w-[220px]">Tags</TableHead>
               <TableHead className="w-[110px]">Tamanho</TableHead>
               <TableHead className="w-[240px]">Variável</TableHead>
-              <TableHead className="w-[160px] text-right sticky right-0 z-20 bg-card border-l">Ações</TableHead>
+              <TableHead className="sticky right-0 z-20 w-[160px] border-l bg-card text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {media.map((m) => (
-              <TableRow key={m.id}>
+              <TableRow key={m.id} className="hover:bg-[#79D6BB]/10">
                 <TableCell className="font-medium max-w-[280px] truncate" title={m.name}>
                   {m.name}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="flex w-fit items-center gap-1">
+                  <Badge variant="outline" className="flex w-fit items-center gap-1 border-[#46B5A9]/40 text-[#124C3B]">
                     {getMediaIcon(m.type)}
                     {m.type}
                   </Badge>
@@ -172,7 +172,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 min-w-0">
-                    <code className="text-xs font-mono bg-muted px-2 py-1 rounded truncate max-w-[180px]" title={m.variable}>
+                    <code className="max-w-[180px] truncate rounded bg-[#071418]/5 px-2 py-1 font-mono text-xs text-[#124C3B]" title={m.variable}>
                       {m.variable}
                     </code>
                     <CopyVariableButton variable={m.variable} />
@@ -210,6 +210,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                       }}
                       disabled={deleteMediaMutation.isPending}
                       title="Deletar"
+                      className="bg-[#0F5739] hover:bg-[#124C3B]"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
