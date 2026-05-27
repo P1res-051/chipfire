@@ -11,6 +11,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Send,
   Trash2,
   Wand2,
   X,
@@ -36,6 +37,15 @@ import { getErrorMessage } from '@/lib/http'
 type MediaType = 'IMAGE' | 'VIDEO' | 'AUDIO' | 'PDF' | 'DOCUMENT' | 'TEXT'
 type ContentGroupType = 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'MIXED'
 type ContentStatus = 'ACTIVE' | 'INACTIVE'
+
+type InstanceStatus = 'WAITING_QR' | 'CONNECTED' | 'DISCONNECTED' | 'ERROR' | 'PAUSED'
+type Instance = {
+  id: string
+  instanceName: string
+  status: InstanceStatus
+  phoneNumber: string | null
+  user?: { id: string; name: string; email: string }
+}
 
 type MediaAsset = {
   id: string
@@ -150,6 +160,10 @@ export function AdminTemplatesPage() {
   const [q, setQ] = React.useState('')
   const [open, setOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Template | null>(null)
+  const [sendOpen, setSendOpen] = React.useState(false)
+  const [sendTemplate, setSendTemplate] = React.useState<Template | null>(null)
+  const [originInstanceId, setOriginInstanceId] = React.useState<string>('')
+  const [targetInstanceId, setTargetInstanceId] = React.useState<string>('')
   const [groupPickerOpen, setGroupPickerOpen] = React.useState(false)
   const [groupSearch, setGroupSearch] = React.useState('')
   const [mediaPickerOpen, setMediaPickerOpen] = React.useState(false)
@@ -171,6 +185,30 @@ export function AdminTemplatesPage() {
       const { data } = await api.get('/content-groups')
       return data as ContentGroup[]
     },
+  })
+
+  const connectedInstances = useQuery({
+    queryKey: ['admin', 'instances', 'connected'],
+    enabled: sendOpen,
+    queryFn: async () => {
+      const { data } = await api.get('/instances', { params: { status: 'CONNECTED' } })
+      return data as Instance[]
+    },
+  })
+
+  const manualSend = useMutation({
+    mutationFn: async (payload: { originInstanceId: string; targetInstanceId: string; templateId: string }) => {
+      const { data } = await api.post('/instances/manual-send-template', payload)
+      return data as { ok: boolean }
+    },
+    onSuccess: () => {
+      toast({ title: 'Enviado', description: 'Mensagem enviada para a instância de destino.', variant: 'success' })
+      setSendOpen(false)
+      setSendTemplate(null)
+      setOriginInstanceId('')
+      setTargetInstanceId('')
+    },
+    onError: (e) => toast({ title: 'Falha ao enviar', description: getErrorMessage(e), variant: 'destructive' }),
   })
 
   const mediaLibrary = useQuery({
@@ -566,6 +604,19 @@ export function AdminTemplatesPage() {
                           aria-label={`Editar template ${template.name}`}
                         >
                           <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="outline"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            setSendTemplate(template)
+                            setSendOpen(true)
+                          }}
+                          title="Enviar manualmente (instância -> instância)"
+                          aria-label={`Enviar template ${template.name}`}
+                        >
+                          <Send className="h-4 w-4" />
                         </Button>
                         <Button
                           size="icon"
@@ -970,6 +1021,84 @@ export function AdminTemplatesPage() {
                 </div>
               </div>
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={sendOpen}
+        onOpenChange={(v) => {
+          setSendOpen(v)
+          if (!v) {
+            setSendTemplate(null)
+            setOriginInstanceId('')
+            setTargetInstanceId('')
+          }
+        }}
+      >
+        <DialogContent title="Enviar template" description="Envia o template selecionado de uma instância CONNECTED para outra instância CONNECTED.">
+          <div className="space-y-4">
+            <div className="rounded-xl border bg-secondary/10 p-4">
+              <div className="text-sm font-medium">Template</div>
+              <div className="mt-1 text-sm text-muted-foreground">{sendTemplate?.name ?? '—'}</div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Origem (CONNECTED)</label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={originInstanceId}
+                  onChange={(e) => setOriginInstanceId(e.target.value)}
+                >
+                  <option value="">Selecione…</option>
+                  {(connectedInstances.data ?? []).map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.instanceName} {i.phoneNumber ? `· ${i.phoneNumber}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm text-muted-foreground">Destino (CONNECTED)</label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                  value={targetInstanceId}
+                  onChange={(e) => setTargetInstanceId(e.target.value)}
+                >
+                  <option value="">Selecione…</option>
+                  {(connectedInstances.data ?? []).map((i) => (
+                    <option key={i.id} value={i.id}>
+                      {i.instanceName} {i.phoneNumber ? `· ${i.phoneNumber}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setSendOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                disabled={!sendTemplate?.id || !originInstanceId || !targetInstanceId || manualSend.isPending}
+                onClick={() => {
+                  if (!sendTemplate?.id) return
+                  manualSend.mutate({ originInstanceId, targetInstanceId, templateId: sendTemplate.id })
+                }}
+              >
+                {manualSend.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enviando…
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" /> Enviar
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

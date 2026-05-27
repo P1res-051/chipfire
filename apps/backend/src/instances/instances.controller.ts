@@ -9,6 +9,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { AuditService } from '../audit/audit.service';
 import { CreateInstanceDto } from './dto/create-instance.dto';
 import { AdminCreateInstanceDto } from './dto/admin-create-instance.dto';
+import { AdminSendTemplateDto } from './dto/admin-send-template.dto'
 import { UpdateInstanceMaturationConfigDto } from './dto/update-instance-maturation-config.dto'
 import { UpdateInstanceMaturationDto } from './dto/update-instance-maturation.dto'
 import { InstanceMaturationService } from './instance-maturation.service'
@@ -134,6 +135,26 @@ export class InstancesController {
   @Post(':id/maturation/trigger')
   triggerMaturation(@CurrentUser() user: JwtPayload, @Param('id') id: string) {
     return this.maturation.triggerNow(user, id)
+  }
+
+  @Roles(UserRole.ADMIN)
+  @Post('manual-send-template')
+  async manualSendTemplate(
+    @Req() req: any,
+    @CurrentUser() actor: JwtPayload,
+    @Body() dto: AdminSendTemplateDto,
+  ) {
+    const result = await this.instances.adminSendTemplateToInstance(actor, dto)
+    await this.audit.log({
+      userId: actor.sub,
+      action: 'ADMIN_INSTANCE_MANUAL_SEND_TEMPLATE',
+      entity: 'WhatsAppInstance',
+      entityId: dto.originInstanceId,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      meta: { ...dto, result },
+    })
+    return result
   }
 
   @Delete(':id')
