@@ -287,6 +287,28 @@ export class EvolutionService {
   private normalizeMediaUrl(media: string) {
     if (!media) return media;
 
+    // Nosso storage pode persistir referências internas (não-URL) no banco como fallback:
+    // - local://<filename>
+    // - minio://<bucket>/<key>
+    // A Evolution API precisa receber uma URL http(s) ou base64.
+    if (media.startsWith('local://')) {
+      const fileName = media.replace('local://', '');
+      const base = this.internalApiBaseUrl || this.publicApiBaseUrl;
+      if (!base) return media;
+      return `${base}/storage/uploads/${fileName}`;
+    }
+
+    if (media.startsWith('minio://')) {
+      // minio://bucket/key
+      const withoutScheme = media.replace('minio://', '');
+      const firstSlash = withoutScheme.indexOf('/');
+      const bucket = firstSlash >= 0 ? withoutScheme.slice(0, firstSlash) : withoutScheme;
+      const key = firstSlash >= 0 ? withoutScheme.slice(firstSlash + 1) : '';
+      const endpoint = (this.minioEndpoint || '').replace(/\/+$/, '');
+      if (!endpoint || !bucket || !key) return media;
+      return `${endpoint}/${bucket}/${key}`;
+    }
+
     // Caminhos relativos (ex: /storage/uploads/...) precisam virar URL absoluta
     if (media.startsWith('/')) {
       const base = this.internalApiBaseUrl || this.publicApiBaseUrl;
