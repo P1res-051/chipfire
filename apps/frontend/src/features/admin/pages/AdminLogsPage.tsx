@@ -122,33 +122,48 @@ export function AdminLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Logs</h1>
-          <ApiStatusPill />
+      <div className="relative flex flex-col gap-4 overflow-hidden rounded-2xl border bg-gradient-to-br from-[#071418] via-[#071418] to-[#0F5739]/30 p-6 md:flex-row md:items-center md:justify-between">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#45C9A4] via-[#52C9EB] to-[#46B5A9]" />
+        <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#52C9EB]/10 blur-2xl" />
+        <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-[#45C9A4]/10 blur-2xl" />
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold text-white">Logs</h1>
+            <ApiStatusPill />
+          </div>
+          <p className="text-sm text-white/70">
+            MessageLog (envio/recebimento/erros) e AuditLog (ações administrativas). Use filtros para investigar incidentes.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          MessageLog (envio/recebimento/erros) e AuditLog (ações administrativas). Use filtros para investigar incidentes.
-        </p>
       </div>
 
-      <Card>
-        <CardHeader>
+      <Card className="overflow-hidden border-[#3D8E66]/25">
+        <CardHeader className="bg-gradient-to-r from-[#071418]/10 via-transparent to-[#0F5739]/10">
           <CardTitle>Filtros</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid gap-3 md:grid-cols-4">
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Data inicial (ISO)</label>
-              <Input value={from} onChange={(e) => setFrom(e.target.value)} placeholder="2026-05-01T00:00:00Z" />
+              <Input
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                placeholder="2026-05-01T00:00:00Z"
+                className="focus-visible:ring-[#52C9EB]/40"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Data final (ISO)</label>
-              <Input value={to} onChange={(e) => setTo(e.target.value)} placeholder="2026-05-09T23:59:59Z" />
+              <Input
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                placeholder="2026-05-09T23:59:59Z"
+                className="focus-visible:ring-[#52C9EB]/40"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Usuário</label>
-              <Select value={userId} onChange={(e) => setUserId(e.target.value)}>
+              <Select value={userId} onChange={(e) => setUserId(e.target.value)} className="focus-visible:ring-[#52C9EB]/40">
                 <option value="">Todos</option>
                 {(users.data ?? []).map((u) => (
                   <option key={u.id} value={u.id}>
@@ -160,6 +175,7 @@ export function AdminLogsPage() {
             <div className="flex items-end gap-2">
               <Button
                 variant="outline"
+                className="border-[#3D8E66]/40 bg-transparent hover:bg-[#79D6BB]/10"
                 onClick={() => {
                   setFrom('')
                   setTo('')
@@ -178,7 +194,7 @@ export function AdminLogsPage() {
           <div className="mt-4 grid gap-3 md:grid-cols-4">
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Instância</label>
-              <Select value={instanceId} onChange={(e) => setInstanceId(e.target.value)}>
+              <Select value={instanceId} onChange={(e) => setInstanceId(e.target.value)} className="focus-visible:ring-[#52C9EB]/40">
                 <option value="">Todas</option>
                 {(instances.data ?? []).map((i) => (
                   <option key={i.id} value={i.id}>
@@ -189,7 +205,7 @@ export function AdminLogsPage() {
             </div>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Direção</label>
-              <Select value={direction} onChange={(e) => setDirection(e.target.value)}>
+              <Select value={direction} onChange={(e) => setDirection(e.target.value)} className="focus-visible:ring-[#52C9EB]/40">
                 <option value="">Todas</option>
                 <option value="INBOUND">INBOUND</option>
                 <option value="OUTBOUND">OUTBOUND</option>
@@ -197,18 +213,28 @@ export function AdminLogsPage() {
             </div>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Status (MessageLog)</label>
-              <Input value={status} onChange={(e) => setStatus(e.target.value)} placeholder="SUCCESS / ERROR / ..." />
+              <Input
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                placeholder="SUCCESS / ERROR / ..."
+                className="focus-visible:ring-[#52C9EB]/40"
+              />
             </div>
             <div className="space-y-1">
               <label className="text-sm text-muted-foreground">Ação (AuditLog)</label>
-              <Input value={auditAction} onChange={(e) => setAuditAction(e.target.value)} placeholder="ADMIN_USER_CREATE" />
+              <Input
+                value={auditAction}
+                onChange={(e) => setAuditAction(e.target.value)}
+                placeholder="ADMIN_USER_CREATE"
+                className="focus-visible:ring-[#52C9EB]/40"
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <Card className="overflow-hidden border-[#3D8E66]/25">
+        <CardHeader className="flex flex-col gap-2 bg-gradient-to-r from-[#071418]/10 via-transparent to-[#0F5739]/10 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>MessageLog</CardTitle>
           <div className="text-sm text-muted-foreground">
             {messageLogs.isPending ? 'Carregando…' : `${messageLogs.data?.length ?? 0} itens`}
@@ -222,11 +248,13 @@ export function AdminLogsPage() {
               icon={<ListX className="h-6 w-6" />}
               title="Nenhum log encontrado"
               description="Ajuste os filtros (datas, direção, status) para visualizar eventos."
+              className="border-[#3D8E66]/25 bg-gradient-to-br from-[#071418]/5 via-transparent to-[#0F5739]/10"
             />
           ) : (
-            <Table className="mt-2 min-w-[1100px]">
-              <TableHeader>
-                <TableRow>
+            <div className="mt-2 overflow-x-auto rounded-xl border border-border/70 bg-background/30">
+              <Table className="min-w-[1100px]">
+                <TableHeader>
+                  <TableRow className="bg-gradient-to-r from-[#071418]/5 via-transparent to-[#0F5739]/10">
                   <TableHead className="w-[170px]">Quando</TableHead>
                   <TableHead className="w-[240px]">Usuário</TableHead>
                   <TableHead className="w-[220px]">Instância</TableHead>
@@ -234,12 +262,12 @@ export function AdminLogsPage() {
                   <TableHead className="w-[110px]">Direção</TableHead>
                   <TableHead className="w-[140px]">Status</TableHead>
                   <TableHead className="w-[160px]">Erro</TableHead>
-                  <TableHead className="w-[110px] sticky right-0 z-20 bg-card border-l">Meta</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(messageLogs.data ?? []).map((l) => (
-                  <TableRow key={l.id}>
+                  <TableHead className="w-[110px] sticky right-0 z-20 border-l bg-card/95">Meta</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(messageLogs.data ?? []).map((l) => (
+                    <TableRow key={l.id} className="hover:bg-[#79D6BB]/10">
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(l.createdAt)}</TableCell>
                     <TableCell className="text-muted-foreground max-w-[240px] truncate" title={l.user?.email ?? l.userId}>
                       {l.user?.email ?? l.userId}
@@ -263,7 +291,7 @@ export function AdminLogsPage() {
                         '—'
                       )}
                     </TableCell>
-                    <TableCell className="sticky right-0 z-10 bg-card border-l">
+                    <TableCell className="sticky right-0 z-10 border-l bg-card/95">
                       <Button
                         size="sm"
                         variant="outline"
@@ -273,14 +301,16 @@ export function AdminLogsPage() {
                         }}
                         disabled={!l.meta}
                         title={!l.meta ? 'Sem meta' : 'Ver meta'}
+                        className="border-[#3D8E66]/40 bg-transparent hover:bg-[#79D6BB]/10"
                       >
                         Meta
                       </Button>
                     </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -291,14 +321,14 @@ export function AdminLogsPage() {
           description="Meta salva no MessageLog para auditoria (pode conter templateOriginal/renderedText/dynamicGroups/warnings/errors)."
           className="max-w-4xl"
         >
-          <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-words rounded-md bg-black/30 p-3 text-xs text-muted-foreground">
+          <pre className="max-h-[70vh] overflow-auto whitespace-pre-wrap break-words rounded-xl border border-[#3D8E66]/20 bg-gradient-to-br from-[#071418]/40 via-black/20 to-[#0F5739]/20 p-3 text-xs text-muted-foreground">
             {metaLog?.meta ? JSON.stringify(metaLog.meta, null, 2) : '—'}
           </pre>
         </DialogContent>
       </Dialog>
 
-      <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <Card className="overflow-hidden border-[#3D8E66]/25">
+        <CardHeader className="flex flex-col gap-2 bg-gradient-to-r from-[#071418]/10 via-transparent to-[#0F5739]/10 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>AuditLog</CardTitle>
           <div className="text-sm text-muted-foreground">{auditLogs.isPending ? 'Carregando…' : `${auditLogs.data?.length ?? 0} itens`}</div>
         </CardHeader>
@@ -310,28 +340,30 @@ export function AdminLogsPage() {
               icon={<ListX className="h-6 w-6" />}
               title="Nenhum audit log encontrado"
               description="Ajuste o filtro de ação (ex.: ADMIN_USER_CREATE) ou o intervalo de datas."
+              className="border-[#3D8E66]/25 bg-gradient-to-br from-[#071418]/5 via-transparent to-[#0F5739]/10"
             />
           ) : (
-            <Table className="mt-2 min-w-[980px]">
-              <colgroup>
-                <col className="w-[16%]" />
-                <col className="w-[22%]" />
-                <col className="w-[20%]" />
-                <col className="w-[28%]" />
-                <col className="w-[14%]" />
-              </colgroup>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Quando</TableHead>
-                  <TableHead>Usuário</TableHead>
-                  <TableHead>Ação</TableHead>
-                  <TableHead>Entidade</TableHead>
-                  <TableHead>IP</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(auditLogs.data ?? []).map((a) => (
-                  <TableRow key={a.id}>
+            <div className="mt-2 overflow-x-auto rounded-xl border border-border/70 bg-background/30">
+              <Table className="min-w-[980px]">
+                <colgroup>
+                  <col className="w-[16%]" />
+                  <col className="w-[22%]" />
+                  <col className="w-[20%]" />
+                  <col className="w-[28%]" />
+                  <col className="w-[14%]" />
+                </colgroup>
+                <TableHeader>
+                  <TableRow className="bg-gradient-to-r from-[#071418]/5 via-transparent to-[#0F5739]/10">
+                    <TableHead>Quando</TableHead>
+                    <TableHead>Usuário</TableHead>
+                    <TableHead>Ação</TableHead>
+                    <TableHead>Entidade</TableHead>
+                    <TableHead>IP</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(auditLogs.data ?? []).map((a) => (
+                    <TableRow key={a.id} className="hover:bg-[#79D6BB]/10">
                     <TableCell className="text-muted-foreground text-xs whitespace-nowrap">{formatDateTime(a.createdAt)}</TableCell>
                     <TableCell className="text-muted-foreground max-w-[260px] truncate" title={a.user?.email ?? a.userId ?? '—'}>
                       {a.user?.email ?? a.userId ?? '—'}
@@ -343,10 +375,11 @@ export function AdminLogsPage() {
                       {a.entity ? `${a.entity}${a.entityId ? `#${a.entityId}` : ''}` : '—'}
                     </TableCell>
                     <TableCell className="text-muted-foreground whitespace-nowrap">{a.ipAddress ?? '—'}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </CardContent>
       </Card>

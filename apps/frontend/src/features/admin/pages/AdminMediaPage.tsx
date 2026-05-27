@@ -103,36 +103,42 @@ export function AdminMediaPage() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="flex flex-col gap-3 md:flex-row md:items-center">
-        <div className="flex-1">
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nome, slug ou tag…"
-            className="focus-visible:ring-[#52C9EB]/40"
-          />
-        </div>
-        <div className="w-full md:w-48">
-          <Select
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as any)}
-            className="focus-visible:ring-[#52C9EB]/40"
-          >
-            <option value="ALL">Todos os tipos</option>
-            <option value="IMAGE">Imagem</option>
-            <option value="VIDEO">Vídeo</option>
-            <option value="AUDIO">Áudio</option>
-            <option value="PDF">PDF</option>
-            <option value="DOCUMENT">Documento</option>
-            <option value="TEXT">Texto</option>
-          </Select>
-        </div>
-      </div>
+      <Card className="overflow-hidden border-[#3D8E66]/25">
+        <CardHeader className="bg-gradient-to-r from-[#071418]/10 via-transparent to-[#0F5739]/10">
+          <CardTitle>Filtros</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="flex-1">
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar por nome, slug ou tag…"
+                className="focus-visible:ring-[#52C9EB]/40"
+              />
+            </div>
+            <div className="w-full md:w-56">
+              <Select
+                value={typeFilter}
+                onChange={(e) => setTypeFilter(e.target.value as any)}
+                className="focus-visible:ring-[#52C9EB]/40"
+              >
+                <option value="ALL">Todos os tipos</option>
+                <option value="IMAGE">Imagem</option>
+                <option value="VIDEO">Vídeo</option>
+                <option value="AUDIO">Áudio</option>
+                <option value="PDF">PDF</option>
+                <option value="DOCUMENT">Documento</option>
+                <option value="TEXT">Texto</option>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Lista de Mídias */}
-      <Card>
-        <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <Card className="overflow-hidden border-[#3D8E66]/25">
+        <CardHeader className="flex flex-col gap-2 bg-gradient-to-r from-[#071418]/10 via-transparent to-[#0F5739]/10 sm:flex-row sm:items-center sm:justify-between">
           <CardTitle>Biblioteca</CardTitle>
           <div className="text-sm text-muted-foreground">
             {mediaQuery.isPending ? 'Carregando…' : `${mediaQuery.data?.total || 0} itens`}
@@ -152,6 +158,7 @@ export function AdminMediaPage() {
               description="Comece fazendo upload de um arquivo ou criando um texto reutilizável."
               primaryAction={{ label: 'Fazer upload', onClick: () => setUploadOpen(true) }}
               secondaryAction={{ label: 'Novo texto', onClick: () => setTextOpen(true), variant: 'outline' }}
+              className="border-[#3D8E66]/25 bg-gradient-to-br from-[#071418]/5 via-transparent to-[#0F5739]/10"
             />
           ) : (
             <MediaList

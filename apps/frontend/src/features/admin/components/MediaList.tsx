@@ -124,16 +124,17 @@ export function MediaList({ media, isLoading }: MediaListProps) {
 
   return (
     <>
-      <Table className="mt-4 min-w-[980px]">
+      <div className="mt-2 overflow-x-auto rounded-xl border border-border/70 bg-background/30">
+        <Table className="min-w-[980px]">
           <TableHeader>
-            <TableRow className="bg-gradient-to-r from-[#071418]/5 via-transparent to-[#0F5739]/5">
+            <TableRow className="bg-gradient-to-r from-[#071418]/5 via-transparent to-[#0F5739]/10">
               <TableHead className="w-[280px]">Nome</TableHead>
               <TableHead className="w-[140px]">Tipo</TableHead>
               <TableHead className="w-[220px]">Slug</TableHead>
               <TableHead className="w-[220px]">Tags</TableHead>
               <TableHead className="w-[110px]">Tamanho</TableHead>
               <TableHead className="w-[240px]">Variável</TableHead>
-              <TableHead className="sticky right-0 z-20 w-[160px] border-l bg-card text-right">Ações</TableHead>
+              <TableHead className="sticky right-0 z-20 w-[160px] border-l bg-card/95 text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -143,7 +144,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                   {m.name}
                 </TableCell>
                 <TableCell>
-                  <Badge variant="outline" className="flex w-fit items-center gap-1 border-[#46B5A9]/40 text-[#124C3B]">
+                  <Badge variant="outline" className="flex w-fit items-center gap-1 border-[#46B5A9]/40 bg-transparent text-foreground">
                     {getMediaIcon(m.type)}
                     {m.type}
                   </Badge>
@@ -172,13 +173,16 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-1 min-w-0">
-                    <code className="max-w-[180px] truncate rounded bg-[#071418]/5 px-2 py-1 font-mono text-xs text-[#124C3B]" title={m.variable}>
+                    <code
+                      className="max-w-[180px] truncate rounded-md border border-[#46B5A9]/25 bg-[#071418]/20 px-2 py-1 font-mono text-xs text-[#0F5739] dark:text-[#79D6BB]"
+                      title={m.variable}
+                    >
                       {m.variable}
                     </code>
                     <CopyVariableButton variable={m.variable} />
                   </div>
                 </TableCell>
-                <TableCell className="text-right whitespace-nowrap sticky right-0 z-10 bg-card border-l">
+                <TableCell className="text-right whitespace-nowrap sticky right-0 z-10 border-l bg-card/95">
                   <div className="flex justify-end gap-1 flex-wrap">
                     {m.publicUrl && m.type !== 'TEXT' && (
                       <Button
@@ -186,6 +190,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                         size="sm"
                         onClick={() => handlePreview(m)}
                         title="Preview"
+                        className="hover:bg-[#79D6BB]/10"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -196,6 +201,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                         size="sm"
                         onClick={() => handleDownload(m)}
                         title="Download"
+                        className="hover:bg-[#79D6BB]/10"
                       >
                         <Download className="h-4 w-4" />
                       </Button>
@@ -210,7 +216,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
                       }}
                       disabled={deleteMediaMutation.isPending}
                       title="Deletar"
-                      className="bg-[#0F5739] hover:bg-[#124C3B]"
+                      className="bg-destructive/90 hover:bg-destructive"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -220,6 +226,7 @@ export function MediaList({ media, isLoading }: MediaListProps) {
             ))}
           </TableBody>
         </Table>
+      </div>
 
       {/* Preview Dialog */}
       <MediaPreviewDialog
