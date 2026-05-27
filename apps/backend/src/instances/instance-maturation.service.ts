@@ -149,13 +149,15 @@ export class InstanceMaturationService implements OnModuleInit {
         },
       })
 
-      await Promise.all(instancesToEnable.map((instance) => this.enqueue(instance.id)))
     }
+
+    await Promise.all(connected.map((instance) => this.enqueue(instance.id, DEFAULT_ENABLE_DELAY_MS)))
 
     return {
       connectedCount: connected.length,
       enabledCount: instancesToEnable.length,
       alreadyEnabledCount: connected.length - instancesToEnable.length,
+      requeuedCount: connected.length,
     }
   }
 
@@ -222,6 +224,8 @@ export class InstanceMaturationService implements OnModuleInit {
         },
       })
       .catch(() => undefined)
+
+    await this.removePendingJobsForInstance(instanceId)
 
     await this.maturationQueue.add(
       'instance-maturation',
@@ -607,10 +611,28 @@ export class InstanceMaturationService implements OnModuleInit {
       },
     })
 
-    if (eligibleTargets.length === 0) return null
+    const targetPool =
+      eligibleTargets.length > 0
+        ? eligibleTargets
+        : await this.prisma.whatsAppInstance.findMany({
+            where: {
+              id: { not: origin.id },
+              maturationEnabled: true,
+              status: InstanceStatus.CONNECTED,
+              phoneNumber: { not: null },
+            },
+            orderBy: [{ maturationLastSentAt: 'asc' }, { updatedAt: 'asc' }],
+            select: {
+              id: true,
+              instanceName: true,
+              phoneNumber: true,
+            },
+          })
+
+    if (targetPool.length === 0) return null
 
     const instance =
-      eligibleTargets[Math.floor(Math.random() * Math.min(eligibleTargets.length, 3))] ?? eligibleTargets[0]
+      targetPool[Math.floor(Math.random() * Math.min(targetPool.length, 3))] ?? targetPool[0]
 
     return instance
       ? {
@@ -703,7 +725,6 @@ export class InstanceMaturationService implements OnModuleInit {
     const instance = await this.prisma.whatsAppInstance.findFirst({
       where: {
         id: targetId,
-        userId: origin.userId,
         maturationEnabled: true,
         status: InstanceStatus.CONNECTED,
         phoneNumber: { not: null },
@@ -723,6 +744,12 @@ export class InstanceMaturationService implements OnModuleInit {
           phoneNumber: instance.phoneNumber ?? '',
         }
       : this.pickTarget(origin)
+  }
+
+  private async removePendingJobsForInstance(instanceId: string) {
+    const jobs = await this.maturationQueue.getJobs(['delayed', 'waiting', 'waiting-children'], 0, 200)
+    const staleJobs = jobs.filter((job) => job.data?.instanceId === instanceId)
+    await Promise.all(staleJobs.map((job) => job.remove().catch(() => undefined)))
   }
 
   private async pickTemplate(userId: string): Promise<MaturationTemplate> {

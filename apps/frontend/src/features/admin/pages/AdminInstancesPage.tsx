@@ -264,6 +264,7 @@ export function AdminInstancesPage() {
         connectedCount: number
         enabledCount: number
         alreadyEnabledCount: number
+        requeuedCount: number
       }
     },
     onSuccess: async (data) => {
@@ -271,8 +272,8 @@ export function AdminInstancesPage() {
         title: 'Maturacao ativada',
         description:
           data.enabledCount > 0
-            ? `${data.enabledCount} de ${data.connectedCount} instancias conectadas entraram na fila.`
-            : `${data.connectedCount} instancias conectadas ja estavam com maturacao ativa.`,
+            ? `${data.enabledCount} de ${data.connectedCount} instancias conectadas foram ativadas; ${data.requeuedCount} entraram na fila.`
+            : `${data.connectedCount} instancias conectadas ja estavam ativas e foram recolocadas na fila.`,
         variant: 'success',
       })
       await qc.invalidateQueries({ queryKey: ['admin', 'instances'] })
