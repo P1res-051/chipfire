@@ -522,7 +522,7 @@ export function AdminTemplatesPage() {
                   <TableHead>Midia principal</TableHead>
                   <TableHead>Tags</TableHead>
                   <TableHead>Previa</TableHead>
-                  <TableHead className="text-right">Acoes</TableHead>
+                  <TableHead className="w-[220px] text-right">Acoes</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -577,8 +577,21 @@ export function AdminTemplatesPage() {
                         ) : null}
                       </div>
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-1">
+                    <TableCell className="w-[220px] text-right">
+                      <div className="flex min-w-[210px] items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          className="h-8 bg-gradient-to-r from-[#52C9EB] to-[#45C9A4] px-2 text-[#071418] hover:opacity-90"
+                          onClick={() => {
+                            setSendTemplate(template)
+                            setSendOpen(true)
+                          }}
+                          title="Enviar manualmente (instância -> instância)"
+                          aria-label={`Enviar template ${template.name}`}
+                        >
+                          <Send className="h-4 w-4" />
+                          Disparar
+                        </Button>
                         <Button
                           size="icon"
                           variant="outline"
@@ -604,19 +617,6 @@ export function AdminTemplatesPage() {
                           aria-label={`Editar template ${template.name}`}
                         >
                           <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8"
-                          onClick={() => {
-                            setSendTemplate(template)
-                            setSendOpen(true)
-                          }}
-                          title="Enviar manualmente (instância -> instância)"
-                          aria-label={`Enviar template ${template.name}`}
-                        >
-                          <Send className="h-4 w-4" />
                         </Button>
                         <Button
                           size="icon"
